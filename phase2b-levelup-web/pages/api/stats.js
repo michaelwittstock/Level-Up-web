@@ -5,7 +5,8 @@ const ENERGY_DB = "2d4f49729dc1445ab0d1cedd4f8e960e";
 // GET /api/stats -> 14-day trends { energy: [...], h75: [...] }
 export default async function handler(req, res) {
   try {
-    const since = new Date(Date.now() - 14 * 86400000).toISOString().slice(0, 10);
+    const days = Math.min(120, Math.max(7, Number(req.query.days) || 14));
+    const since = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
 
     const [energyPages, h75Pages] = await Promise.all([
       queryAll(ENERGY_DB, {
@@ -23,6 +24,7 @@ export default async function handler(req, res) {
       date: p.properties?.Date?.date?.start || "",
       sleep: num(p, "Sleep (hrs)"),
       energy: num(p, "Energy (1-10)"),
+      weight: num(p, "Weight (lbs)"),
       mood: sel(p, "Mood"),
     }));
 

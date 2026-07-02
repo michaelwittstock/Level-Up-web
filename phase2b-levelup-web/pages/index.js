@@ -18,6 +18,14 @@ function todayStr() {
 function mmss(s) {
   return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
 }
+// instant-load cache: render last known data immediately, refresh in background
+function lsGet(k) {
+  if (typeof window === "undefined") return null;
+  try { return JSON.parse(localStorage.getItem("c:" + k)); } catch { return null; }
+}
+function lsSet(k, v) {
+  try { localStorage.setItem("c:" + k, JSON.stringify(v)); } catch {}
+}
 function loadS() {
   if (typeof window === "undefined") return { xp: 0, streak: 0, lastDay: "", wins: 0, pomo: 0, pomoDay: "" };
   try {
@@ -68,7 +76,11 @@ export default function Home() {
         <title>Level Up</title>
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="theme-color" content="#0d0f14" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="theme-color" content="#0b0d12" />
+        <link rel="manifest" href="/manifest.json" />
+        <link rel="apple-touch-icon" href="/icon-180.png" />
+        <link rel="icon" href="/icon-180.png" />
       </Head>
 
       <header className="hero">
@@ -92,7 +104,7 @@ export default function Home() {
 
       <main>
         {tab === "today" && <Today xp={xp} say={say} />}
-        {tab === "h75" && <H75 xp={xp} say={say} openPage={setReader} />}
+        {tab === "h75" && <><H75 xp={xp} say={say} openPage={setReader} /><WorkoutTimer xp={xp} say={say} /></>}
         {tab === "focus" && <Focus xp={xp} say={say} S={S} save={save} />}
         {tab === "learn" && <Learn openPage={setReader} />}
         {tab === "reflect" && <Reflect xp={xp} say={say} />}
@@ -192,19 +204,23 @@ function Today({ xp, say }) {
 
   const load = useCallback(async () => {
     setErr(null);
+    const cd = lsGet("today"), cr = lsGet("routines"), cc = lsGet("cal");
+    if (cd) setData(cd);
+    if (cr) setRoutines(cr);
+    if (cc !== null && cc !== undefined) setCal(cc);
     try {
       const j = await (await fetch("/api/today")).json();
       if (j.error) throw new Error(j.error);
-      setData(j);
-    } catch (e) { setErr(e.message); }
+      setData(j); lsSet("today", j);
+    } catch (e) { if (!cd) setErr(e.message); }
     try {
       const r = await (await fetch("/api/routines")).json();
-      if (!r.error) setRoutines(r.routines);
+      if (!r.error) { setRoutines(r.routines); lsSet("routines", r.routines); }
     } catch {}
     try {
       const c = await (await fetch("/api/calendar")).json();
-      setCal(c.events); // null = not configured
-    } catch { setCal(null); }
+      setCal(c.events); lsSet("cal", c.events); // null = not configured
+    } catch { if (cc === undefined) setCal(null); }
   }, []);
   useEffect(() => { load(); }, [load]);
 
@@ -236,6 +252,7 @@ function Today({ xp, say }) {
       {data?.quote && (
         <blockquote className="quote">&ldquo;{data.quote.quote}&rdquo;<cite>&mdash; {data.quote.author || "Unknown"}</cite></blockquote>
       )}
+      <NotifyCard say={say} />
       {cal !== undefined && cal !== null && (
         <section>
           <h2>📅 Coming up <span className="sub">next 3 days</span></h2>
@@ -289,6 +306,54 @@ function Today({ xp, say }) {
     </>
   );
 }
+function NotifyCard({ say }) {
+  const [state, setState] = useState("idle"); // idle | unsupported | on | busy
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
+      setState("unsupported"); return;
+    }
+    if (lsGet("push-on")) setState("on");
+  }, []);
+  async function enable() {
+    setState("busy");
+    try {
+      const perm = await Notification.requestPermission();
+      if (perm !== "granted") { setState("idle"); say("Notifications blocked — check browser settings"); return; }
+      const { publicKey } = await (await fetch("/api/push-sub")).json();
+      if (!publicKey) throw new Error("server missing VAPID key");
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlB64(publicKey),
+      });
+      const j = await (await fetch("/api/push-sub", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sub: sub.toJSON() }),
+      })).json();
+      if (j.error) throw new Error(j.error);
+      lsSet("push-on", true); setState("on"); say("Daily quote incoming every morning 🔔");
+    } catch (e) { setState("idle"); say("Couldn't enable: " + e.message); }
+  }
+  if (state === "unsupported" || state === "on") return null;
+  return (
+    <p className="empty" style={{ margin: "0 0 12px" }}>
+      🔔 Want a quote from your library every morning?{" "}
+      <button className="btn sec" disabled={state === "busy"} onClick={enable}>
+        {state === "busy" ? "Enabling…" : "Turn on notifications"}
+      </button>
+    </p>
+  );
+}
+function urlB64(base64) {
+  const pad = "=".repeat((4 - (base64.length % 4)) % 4);
+  const b = (base64 + pad).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(b);
+  const arr = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+  return arr;
+}
+
 function AddEvent() {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -349,16 +414,21 @@ function H75({ xp, say, openPage }) {
 
   const load = useCallback(async () => {
     setErr(null);
+    const ch = lsGet("h75:" + todayStr()), cp = lsGet("plans");
+    if (ch) { setRow(ch.row); setTotals(ch.totals || null); }
+    if (cp) setPlans(cp);
     try {
       const j = await (await fetch("/api/h75?date=" + todayStr())).json();
       if (j.error) throw new Error(j.error);
       setRow(j.row);
       setTotals(j.totals || null);
-    } catch (e) { setErr(e.message); }
+      lsSet("h75:" + todayStr(), j);
+    } catch (e) { if (!ch) setErr(e.message); }
     try {
       const w = await (await fetch("/api/workouts")).json();
-      setPlans(w.error ? { error: w.error } : w.plans);
-    } catch (e) { setPlans({ error: e.message }); }
+      if (!w.error) { setPlans(w.plans); lsSet("plans", w.plans); }
+      else if (!cp) setPlans({ error: w.error });
+    } catch (e) { if (!cp) setPlans({ error: e.message }); }
   }, []);
   useEffect(() => { load(); }, [load]);
 
@@ -455,6 +525,20 @@ function useTimer(total, onDone) {
   };
 }
 
+function WorkoutTimer({ xp, say }) {
+  const work = useTimer(45 * 60, () => { xp(20, true); say("Workout complete! +20 XP 🔥 Check it off above"); });
+  return (
+    <section>
+      <h2>⏱️ 45-min workout timer <span className="sub">counts toward today</span></h2>
+      <div className="timer yellow">{mmss(work.remaining)}</div>
+      <div className="tbtns">
+        <button className="btn" onClick={() => work.toggle()}>{work.running ? "Pause" : "Start"}</button>
+        <button className="btn sec" onClick={() => work.reset()}>Reset</button>
+      </div>
+    </section>
+  );
+}
+
 function Focus({ xp, say, S, save }) {
   const [mode, setMode] = useState(25);
   const pomo = useTimer(mode * 60, () => {
@@ -493,26 +577,67 @@ function Focus({ xp, say, S, save }) {
 }
 
 // ================= LEARN =================
+function initials(s) {
+  return String(s || "?").split(/\s+/).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
+}
+function hueOf(s) {
+  let h = 0;
+  for (const c of String(s || "")) h = (h * 31 + c.charCodeAt(0)) % 360;
+  return h;
+}
+function Cover({ title, author }) {
+  const [err, setErr] = useState(false);
+  if (err) return <Avatar name={title} />;
+  return (
+    <img className="thumb" loading="lazy" alt=""
+      src={"/api/cover?t=" + encodeURIComponent(title) + "&a=" + encodeURIComponent(author || "")}
+      onError={() => setErr(true)} />
+  );
+}
+function Avatar({ name }) {
+  return (
+    <div className="thumb fall" style={{ background: `linear-gradient(135deg, hsl(${hueOf(name)},55%,32%), hsl(${(hueOf(name) + 40) % 360},55%,20%))` }}>
+      {initials(name)}
+    </div>
+  );
+}
+
 function Learn({ openPage }) {
   const [data, setData] = useState(null);
   const [err, setErr] = useState(null);
   const [q, setQ] = useState(null);
+  const [search, setSearch] = useState("");
+  const [bf, setBf] = useState("All");
+  const [cf, setCf] = useState("All");
   const load = useCallback(async () => {
     setErr(null);
+    const c = lsGet("learn");
+    if (c) { setData(c); if (c.quotes?.length) setQ(c.quotes[Math.floor(Math.random() * c.quotes.length)]); }
     try {
       const j = await (await fetch("/api/learn")).json();
       if (j.error) throw new Error(j.error);
-      setData(j);
-      if (j.quotes.length) setQ(j.quotes[Math.floor(Math.random() * j.quotes.length)]);
-    } catch (e) { setErr(e.message); }
+      setData(j); lsSet("learn", j);
+      if (!c && j.quotes.length) setQ(j.quotes[Math.floor(Math.random() * j.quotes.length)]);
+    } catch (e) { if (!c) setErr(e.message); }
   }, []);
   useEffect(() => { load(); }, [load]);
 
   function shuffle() {
     if (data?.quotes?.length) setQ(data.quotes[Math.floor(Math.random() * data.quotes.length)]);
   }
-  const Row = ({ id, title, subtitle, badge, notionUrl }) => (
+  const s = search.trim().toLowerCase();
+  const bookStatus = (b) => (b.status.includes("Finished") ? "Read" : b.status.includes("Reading") ? "Now" : "To read");
+  const courseStatus = (c) => (c.status.includes("Completed") ? "Done" : c.status.includes("progress") ? "Active" : "New");
+  const books = (data?.books || [])
+    .filter((b) => !s || (b.title + " " + b.author).toLowerCase().includes(s))
+    .filter((b) => bf === "All" || bookStatus(b) === bf);
+  const courses = (data?.courses || [])
+    .filter((c) => !s || (c.course + " " + c.instructor + " " + c.category).toLowerCase().includes(s))
+    .filter((c) => cf === "All" || courseStatus(c) === cf);
+
+  const Row = ({ id, title, subtitle, badge, notionUrl, thumb }) => (
     <div className="lrow">
+      {thumb}
       <button className="ltbtn" onClick={() => openPage({ id, title })}>
         <div className="lt"><b>{title}</b><span>{subtitle}</span></div>
       </button>
@@ -527,13 +652,18 @@ function Learn({ openPage }) {
       {!data && !err && <Skel />}
       {data && (
         <>
+          <div className="searchwrap">
+            <input className="search" value={search} onChange={(e) => setSearch(e.target.value)}
+              placeholder="🔍 Search your books & courses…" />
+            {search && <button className="btn sec clearbtn" onClick={() => setSearch("")}>✕</button>}
+          </div>
           <section>
             <h2>🎯 Your ONE <span className="sub">{data.one.books.length + data.one.courses.length} focused</span></h2>
-            {data.one.books.map((b) => <Row key={b.id} id={b.id} title={"📖 " + b.title} subtitle={b.author} badge="Book" notionUrl={b.url} />)}
-            {data.one.courses.map((c) => <Row key={c.id} id={c.id} title={"🎧 " + c.course} subtitle={c.instructor} badge="Course" notionUrl={c.url} />)}
+            {data.one.books.map((b) => <Row key={b.id} id={b.id} title={b.title} subtitle={b.author} badge="Book" notionUrl={b.url} thumb={<Cover title={b.title} author={b.author} />} />)}
+            {data.one.courses.map((c) => <Row key={c.id} id={c.id} title={c.course} subtitle={c.instructor} badge="Course" notionUrl={c.url} thumb={<Avatar name={c.instructor || c.course} />} />)}
             <p className="empty" style={{ marginTop: 6 }}>Tap a title to read it here · ↗ opens Notion</p>
           </section>
-          {q && (
+          {q && !s && (
             <section>
               <h2>💬 Quotes <span className="sub">{data.quotes.length}</span></h2>
               <blockquote className="quote">&ldquo;{q.quote}&rdquo;<cite>&mdash; {q.author || "Unknown"}</cite></blockquote>
@@ -541,22 +671,33 @@ function Learn({ openPage }) {
             </section>
           )}
           <section>
-            <h2>📚 Courses <span className="sub">{data.courses.filter((c) => c.status.includes("Completed")).length}/{data.courses.length} done</span></h2>
-            <div className="scroll">
-              {data.courses.map((c) => (
-                <Row key={c.id} id={c.id} title={c.course} subtitle={(c.instructor || "") + (c.category ? " · " + c.category : "")}
-                  badge={c.status.includes("Completed") ? "Done" : c.status.includes("progress") ? "Active" : "New"} notionUrl={c.url} />
+            <h2>📚 Courses <span className="sub">{courses.length} shown</span></h2>
+            <div className="modes">
+              {["All", "Active", "New", "Done"].map((f) => (
+                <button key={f} className={"modechip" + (cf === f ? " on" : "")} onClick={() => setCf(f)}>{f}</button>
               ))}
+            </div>
+            <div className="scroll">
+              {courses.map((c) => (
+                <Row key={c.id} id={c.id} title={c.course} subtitle={(c.instructor || "") + (c.category ? " · " + c.category : "")}
+                  badge={courseStatus(c)} notionUrl={c.url} thumb={<Avatar name={c.instructor || c.course} />} />
+              ))}
+              {!courses.length && <p className="empty">No courses match.</p>}
             </div>
           </section>
           <section>
-            <h2>📖 Library <span className="sub">{data.books.filter((b) => b.status.includes("Finished")).length}/{data.books.length} read</span></h2>
-            <p className="empty" style={{ margin: "0 0 8px" }}>Tap a book → its summary, lessons &amp; quiz open right here.</p>
-            <div className="scroll">
-              {data.books.map((b) => (
-                <Row key={b.id} id={b.id} title={b.title} subtitle={b.author}
-                  badge={b.status.includes("Finished") ? "Read" : b.status.includes("Reading") ? "Now" : "To read"} notionUrl={b.url} />
+            <h2>📖 Library <span className="sub">{books.length} shown</span></h2>
+            <div className="modes">
+              {["All", "Now", "To read", "Read"].map((f) => (
+                <button key={f} className={"modechip" + (bf === f ? " on" : "")} onClick={() => setBf(f)}>{f}</button>
               ))}
+            </div>
+            <div className="scroll">
+              {books.map((b) => (
+                <Row key={b.id} id={b.id} title={b.title} subtitle={b.author}
+                  badge={bookStatus(b)} notionUrl={b.url} thumb={<Cover title={b.title} author={b.author} />} />
+              ))}
+              {!books.length && <p className="empty">No books match.</p>}
             </div>
           </section>
         </>
@@ -633,6 +774,7 @@ function Reflect({ xp, say }) {
 // ================= ENERGY & SLEEP =================
 function EnergyLog({ xp, say }) {
   const [sleep, setSleep] = useState("");
+  const [weight, setWeight] = useState("");
   const [energy, setEnergy] = useState(7);
   const [mood, setMood] = useState("🙂 Good");
   const [worked, setWorked] = useState(false);
@@ -643,7 +785,7 @@ function EnergyLog({ xp, say }) {
     try {
       const j = await (await fetch("/api/energy", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sleep: sleep === "" ? undefined : Number(sleep), energy, mood, workedOut: worked, date: todayStr() }),
+        body: JSON.stringify({ sleep: sleep === "" ? undefined : Number(sleep), weight: weight === "" ? undefined : Number(weight), energy, mood, workedOut: worked, date: todayStr() }),
       })).json();
       if (j.error) throw new Error(j.error);
       xp(5, false); say("Energy logged. +5 XP 🔋"); setSleep("");
@@ -657,6 +799,8 @@ function EnergyLog({ xp, say }) {
       <div className="erow">
         <label>😴 Sleep (hrs)</label>
         <input className="enum" type="number" step="0.5" min="0" max="14" value={sleep} onChange={(e) => setSleep(e.target.value)} placeholder="7.5" />
+        <label>⚖️ Weight</label>
+        <input className="enum" type="number" step="0.1" min="0" value={weight} onChange={(e) => setWeight(e.target.value)} placeholder="lbs" />
       </div>
       <div className="erow">
         <label>⚡ Energy: <b>{energy}</b>/10</label>
@@ -684,11 +828,13 @@ function Money({ say }) {
 
   const load = useCallback(async () => {
     setErr(null);
+    const c = lsGet("money");
+    if (c) setData(c);
     try {
       const j = await (await fetch("/api/money")).json();
       if (j.error) throw new Error(j.error);
-      setData(j);
-    } catch (e) { setErr(e.message); }
+      setData(j); lsSet("money", j);
+    } catch (e) { if (!c) setErr(e.message); }
   }, []);
   useEffect(() => { load(); }, [load]);
 
@@ -741,25 +887,37 @@ function Money({ say }) {
   );
 }
 
-// ================= STATS (14-day trends) =================
+// ================= STATS (trends) =================
 function Stats() {
   const [data, setData] = useState(null);
   const [err, setErr] = useState(null);
+  const [days, setDays] = useState(14);
   const load = useCallback(async () => {
     setErr(null);
+    const c = lsGet("stats:" + days);
+    if (c) setData(c);
     try {
-      const j = await (await fetch("/api/stats")).json();
+      const j = await (await fetch("/api/stats?days=" + days)).json();
       if (j.error) throw new Error(j.error);
-      setData(j);
-    } catch (e) { setErr(e.message); }
-  }, []);
+      setData(j); lsSet("stats:" + days, j);
+    } catch (e) { if (!c) setErr(e.message); }
+  }, [days]);
   useEffect(() => { load(); }, [load]);
 
   const hasEnergy = data?.energy?.length > 0;
   const hasH75 = data?.h75?.length > 0;
+  const weights = (data?.energy || []).filter((d) => d.weight > 0);
+  const wMin = Math.min(...weights.map((d) => d.weight), Infinity);
+  const wMax = Math.max(...weights.map((d) => d.weight), -Infinity);
   return (
     <section>
-      <h2>📊 Last 14 days <span className="sub">trends</span></h2>
+      <h2>📊 Trends
+        <span className="sub">
+          {[14, 30, 90].map((d) => (
+            <button key={d} className={"modechip" + (days === d ? " on" : "")} style={{ marginLeft: 6, padding: "4px 9px", fontSize: "0.72rem" }} onClick={() => setDays(d)}>{d}d</button>
+          ))}
+        </span>
+      </h2>
       {err && <p className="empty">{err}</p>}
       {!data && !err && <div className="skel" />}
       {data && !hasEnergy && !hasH75 && <p className="empty">Log Energy &amp; Sleep and check off 75 Hard days — your charts grow here.</p>}
@@ -789,6 +947,19 @@ function Stats() {
             ))}
           </div>
           <p className="empty">{data.h75.filter((d) => d.done === 7).length} perfect day{data.h75.filter((d) => d.done === 7).length === 1 ? "" : "s"} in this window.</p>
+        </>
+      )}
+      {weights.length > 1 && (
+        <>
+          <div className="chartlbl">⚖️ Weight ({wMin}–{wMax} lbs)</div>
+          <div className="chart">
+            {weights.map((d, i) => (
+              <div className="cbarwrap" key={i} title={d.day + " · " + d.weight + " lbs"}>
+                <div className="cbar h75b" style={{ height: (wMax === wMin ? 60 : 15 + ((d.weight - wMin) / (wMax - wMin)) * 85) + "%" }} />
+                <span className="cday">{(d.date || "").slice(8)}</span>
+              </div>
+            ))}
+          </div>
         </>
       )}
     </section>

@@ -247,3 +247,27 @@ hr { border: none; border-top: 1px solid var(--line); margin: 12px 0; }
 /* reader media */
 .rvideo { width: 100%; aspect-ratio: 16 / 9; border: none; border-radius: 10px; margin: 10px 0; background: #000; }
 .rlink { display: block; color: var(--blue2); font-size: 0.9rem; margin: 6px 0; word-break: break-all; }
+
+/* search + thumbnails */
+.searchwrap { display: flex; gap: 8px; margin-bottom: 12px; position: sticky; top: 0; z-index: 5; }
+.search { flex: 1; margin-bottom: 0; font-size: 1rem; background: var(--panel); border-color: var(--line); }
+.clearbtn { flex: 0 0 auto; }
+.thumb {
+  width: 42px; height: 58px; object-fit: cover; border-radius: 6px; flex: 0 0 auto;
+  background: var(--panel); border: 1px solid var(--line);
+}
+.thumb.fall { display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 900; font-size: 0.9rem; letter-spacing: 0.03em; }
+
+/* mobile: tabs become a fixed bottom bar (thumb reach) */
+@media (max-width: 700px) {
+  .tabs {
+    position: fixed; left: 0; right: 0; bottom: 0; margin: 0; z-index: 40;
+    background: rgba(11, 13, 18, 0.96); backdrop-filter: blur(12px);
+    border-top: 1px solid var(--line);
+    padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+    justify-content: space-between; overflow-x: auto;
+  }
+  .tab { flex: 1; padding: 8px 4px; font-size: 0.7rem; text-align: center; border-radius: 9px; }
+  .app { padding-bottom: 110px; }
+  .overlay { align-items: flex-end; }
+}

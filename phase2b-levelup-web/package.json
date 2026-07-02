@@ -1,6 +1,6 @@
 {
   "name": "levelup-web",
-  "version": "2.0.0",
+  "version": "5.3.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -11,6 +11,7 @@
     "@notionhq/client": "^2.2.15",
     "next": "^14.2.25",
     "react": "18.3.1",
-    "react-dom": "18.3.1"
+    "react-dom": "18.3.1",
+    "web-push": "^3.6.7"
   }
 }
