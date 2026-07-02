@@ -227,9 +227,23 @@ hr { border: none; border-top: 1px solid var(--line); margin: 12px 0; }
 .perfb { background: var(--yellow); width: 70%; box-shadow: 0 0 8px rgba(245, 197, 24, 0.5); }
 .cday { position: absolute; bottom: -14px; font-size: 0.58rem; color: var(--mut); }
 
-/* content engine */
-.post { background: var(--panel2); border: 1px solid var(--line); border-radius: 11px; margin-bottom: 8px; overflow: hidden; }
-.posthead { display: block; width: 100%; text-align: left; background: transparent; border: none; color: var(--tx); padding: 12px 14px; cursor: pointer; }
-.posthead b { display: block; font-size: 0.92rem; }
-.postbody { padding: 0 14px 12px; border-top: 1px solid var(--line); }
-.tags { color: var(--blue2); font-size: 0.8rem; word-break: break-word; }
+/* journal */
+.prompts { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.prompt {
+  background: var(--panel2); border: 1px solid var(--line); color: var(--mut);
+  font-size: 0.78rem; font-weight: 650; padding: 7px 11px; border-radius: 999px; cursor: pointer; text-align: left;
+}
+.prompt:hover { color: var(--yellow); border-color: var(--yellow); }
+.jwrap { position: relative; }
+.jtext { min-height: 160px; font-size: 1rem; line-height: 1.55; }
+.micbtn {
+  position: absolute; right: 8px; bottom: 16px; background: var(--panel); border: 1px solid var(--line);
+  color: var(--tx); font-weight: 700; font-size: 0.78rem; padding: 7px 11px; border-radius: 999px; cursor: pointer;
+}
+.micbtn.live { background: #7a1e2b; border-color: #d64f6a; color: #ffd7df; animation: pulse 1.2s infinite; }
+@keyframes pulse { 50% { opacity: 0.65; } }
+.addev { background: var(--panel2); border: 1px solid var(--line); border-radius: 11px; padding: 12px; margin-top: 10px; }
+
+/* reader media */
+.rvideo { width: 100%; aspect-ratio: 16 / 9; border: none; border-radius: 10px; margin: 10px 0; background: #000; }
+.rlink { display: block; color: var(--blue2); font-size: 0.9rem; margin: 6px 0; word-break: break-all; }

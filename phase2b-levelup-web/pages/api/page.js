@@ -73,6 +73,12 @@ function simplify(b) {
     }
     case "divider": return { kind: "hr" };
     case "child_page": return { kind: "h3", text: "📄 " + b.child_page.title };
+    case "video": {
+      const url = d.type === "external" ? d.external?.url : d.file?.url;
+      return url ? { kind: "video", url } : null;
+    }
+    case "embed": return d.url ? { kind: "video", url: d.url } : null;
+    case "bookmark": return d.url ? { kind: "link", url: d.url, text: plainText(d.caption) || d.url } : null;
     default: return null;
   }
 }

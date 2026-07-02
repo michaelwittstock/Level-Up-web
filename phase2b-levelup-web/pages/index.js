@@ -8,7 +8,7 @@ const TABS = [
   ["focus", "⏱️ Focus"],
   ["learn", "📚 Learn"],
   ["reflect", "🙏 Reflect"],
-  ["content", "📣 Content"],
+  ["journal", "📝 Journal"],
 ];
 
 function todayStr() {
@@ -96,7 +96,7 @@ export default function Home() {
         {tab === "focus" && <Focus xp={xp} say={say} S={S} save={save} />}
         {tab === "learn" && <Learn openPage={setReader} />}
         {tab === "reflect" && <Reflect xp={xp} say={say} />}
-        {tab === "content" && <Content say={say} />}
+        {tab === "journal" && <Journal xp={xp} say={say} />}
       </main>
 
       <footer className="foot">
@@ -163,6 +163,13 @@ function Reader({ id, fallbackTitle, close, say }) {
                 <span className="box">✓</span>{b.text}
               </button>
             );
+            if (b.kind === "video") {
+              const yt = ytEmbed(b.url);
+              if (yt) return <iframe key={i} className="rvideo" src={yt} allow="fullscreen; encrypted-media" allowFullScreen title={"video-" + i} />;
+              if (/\.(mp4|mov|m4v|webm)(\?|$)/i.test(b.url)) return <video key={i} className="rvideo" src={b.url} controls playsInline preload="metadata" />;
+              return <a key={i} className="rlink" href={b.url} target="_blank" rel="noopener noreferrer">▶ Open video ↗</a>;
+            }
+            if (b.kind === "link") return <a key={i} className="rlink" href={b.url} target="_blank" rel="noopener noreferrer">🔗 {b.text}</a>;
             return <p key={i} className="rp" style={{ marginLeft: b.indent ? 12 : 0 }}>{b.text}</p>;
           })}
           {data && !data.blocks?.length && <p className="empty">This page is empty.</p>}
@@ -229,7 +236,7 @@ function Today({ xp, say }) {
       {data?.quote && (
         <blockquote className="quote">&ldquo;{data.quote.quote}&rdquo;<cite>&mdash; {data.quote.author || "Unknown"}</cite></blockquote>
       )}
-      {cal !== undefined && cal !== null && cal.length > 0 && (
+      {cal !== undefined && cal !== null && (
         <section>
           <h2>📅 Coming up <span className="sub">next 3 days</span></h2>
           {cal.map((e, i) => (
@@ -239,6 +246,8 @@ function Today({ xp, say }) {
               <span className="sub">{dayLabel(e.start)}</span>
             </div>
           ))}
+          {!cal.length && <p className="empty">Nothing on the calendar. 🎉</p>}
+          <AddEvent />
         </section>
       )}
       {cal === null && (
@@ -280,6 +289,48 @@ function Today({ xp, say }) {
     </>
   );
 }
+function AddEvent() {
+  const [open, setOpen] = useState(false);
+  const [title, setTitle] = useState("");
+  const [date, setDate] = useState(todayStr());
+  const [time, setTime] = useState("09:00");
+
+  function go() {
+    if (!title.trim()) return;
+    const d = date.replace(/-/g, "");
+    const t = time.replace(":", "") + "00";
+    const end = String(Number(time.slice(0, 2)) + 1).padStart(2, "0") + time.slice(3) + "00";
+    const url =
+      "https://calendar.google.com/calendar/render?action=TEMPLATE&text=" +
+      encodeURIComponent(title.trim()) +
+      "&dates=" + d + "T" + t + "/" + d + "T" + end;
+    window.open(url, "_blank", "noopener");
+    setOpen(false); setTitle("");
+  }
+
+  if (!open) return <button className="btn sec" style={{ marginTop: 8 }} onClick={() => setOpen(true)}>＋ Add event</button>;
+  return (
+    <div className="addev">
+      <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Event title…" autoFocus />
+      <div className="erow">
+        <input className="enum" style={{ width: 150 }} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        <input className="enum" type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+      </div>
+      <div className="tbtns" style={{ justifyContent: "flex-start" }}>
+        <button className="btn" onClick={go}>Open in Google Calendar</button>
+        <button className="btn sec" onClick={() => setOpen(false)}>Cancel</button>
+      </div>
+      <p className="empty">Opens pre-filled — one tap to save. It&rsquo;ll show here on the next refresh.</p>
+    </div>
+  );
+}
+function ytEmbed(url) {
+  const m = String(url || "").match(/(?:youtube\.com\/(?:watch\?.*v=|shorts\/|embed\/)|youtu\.be\/)([\w-]{6,})/);
+  if (m) return "https://www.youtube.com/embed/" + m[1];
+  const v = String(url || "").match(/vimeo\.com\/(\d+)/);
+  if (v) return "https://player.vimeo.com/video/" + v[1];
+  return null;
+}
 function dayLabel(start) {
   const d = new Date(start), now = new Date();
   if (d.toDateString() === now.toDateString()) return "Today";
@@ -291,6 +342,7 @@ function dayLabel(start) {
 // ================= 75 HARD =================
 function H75({ xp, say, openPage }) {
   const [row, setRow] = useState(undefined);
+  const [totals, setTotals] = useState(null);
   const [err, setErr] = useState(null);
   const [plans, setPlans] = useState(undefined);
   const [openPlan, setOpenPlan] = useState(0);
@@ -301,6 +353,7 @@ function H75({ xp, say, openPage }) {
       const j = await (await fetch("/api/h75?date=" + todayStr())).json();
       if (j.error) throw new Error(j.error);
       setRow(j.row);
+      setTotals(j.totals || null);
     } catch (e) { setErr(e.message); }
     try {
       const w = await (await fetch("/api/workouts")).json();
@@ -336,6 +389,18 @@ function H75({ xp, say, openPage }) {
             ))}
           </div>
           <p className="empty">{done === 7 ? "Perfect day. Unbreakable. 🔥" : "Check off all 7. Miss one → back to Day 1."}</p>
+        </section>
+      )}
+      {totals && (
+        <section>
+          <h2>🏆 Challenge progress <span className="sub">day {totals.elapsed} of {totals.total}</span></h2>
+          <div className="networth">
+            <div><span className="sub">Perfect days</span><b className="pos">{totals.perfect}</b></div>
+            <div><span className="sub">Days in</span><b>{totals.elapsed}</b></div>
+            <div><span className="sub">To go</span><b className="neg">{Math.max(0, totals.total - totals.elapsed)}</b></div>
+          </div>
+          <div className="xpbar" style={{ marginTop: 10 }}><i style={{ width: Math.min(100, (totals.perfect / totals.total) * 100) + "%" }} /></div>
+          <p className="empty" style={{ marginTop: 6 }}>{totals.perfect} of {totals.total} perfect days banked.</p>
         </section>
       )}
       <section>
@@ -730,70 +795,149 @@ function Stats() {
   );
 }
 
-// ================= CONTENT ENGINE =================
-function Content({ say }) {
-  const [posts, setPosts] = useState(null);
-  const [err, setErr] = useState(null);
-  const [open, setOpen] = useState(null); // id
-  const load = useCallback(async () => {
-    setErr(null);
+// ================= JOURNAL (goals / dreams / gratitude) =================
+const PROMPTS = {
+  goal: [
+    "What exactly do I want, and by when?",
+    "Why does this goal matter to me?",
+    "What does life look like when I achieve it?",
+    "What's the very first step I can take this week?",
+    "What will I have to give up or say no to?",
+    "How will I know I'm on track in 30 days?",
+  ],
+  dream: [
+    "If nothing could stop me, what would I build?",
+    "Where do I live and what does a normal day look like in 5 years?",
+    "Who am I becoming in this dream?",
+    "What would I do if I knew I couldn't fail?",
+    "What's the wildest version of this — 10X bigger?",
+  ],
+  gratitude: [
+    "What made me smile today?",
+    "Who am I grateful for right now, and why?",
+    "What went better than expected this week?",
+    "What's something hard that's secretly a gift?",
+    "What do I have today that I once prayed for?",
+  ],
+};
+const AREAS = ["Health", "Work/Business", "Money", "Relationships", "Growth", "Fun/Adventure"];
+
+function useVoice(onText) {
+  const recRef = useRef(null);
+  const [listening, setListening] = useState(false);
+  const supported = typeof window !== "undefined" && !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+  function toggle() {
+    if (!supported) return;
+    if (listening) { recRef.current?.stop(); setListening(false); return; }
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const rec = new SR();
+    rec.continuous = true;
+    rec.interimResults = false;
+    rec.lang = "en-US";
+    rec.onresult = (e) => {
+      let text = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) text += e.results[i][0].transcript + " ";
+      }
+      if (text) onText(text);
+    };
+    rec.onend = () => setListening(false);
+    rec.onerror = () => setListening(false);
+    recRef.current = rec;
+    rec.start();
+    setListening(true);
+  }
+  return { supported, listening, toggle };
+}
+
+function Journal({ xp, say }) {
+  const [mode, setMode] = useState("goal");
+  const [title, setTitle] = useState("");
+  const [area, setArea] = useState("Growth");
+  const [body, setBody] = useState("");
+  const [win, setWin] = useState("");
+  const [busy, setBusy] = useState(false);
+  const voice = useVoice((t) => setBody((b) => (b ? b + " " : "") + t.trim()));
+
+  function usePrompt(q) {
+    setBody((b) => (b ? b + "\n\n" : "") + q + "\n");
+  }
+
+  async function save() {
+    if (mode === "gratitude") {
+      if (!body.trim() && !win.trim()) { say("Write something first 🙂"); return; }
+      setBusy(true);
+      try {
+        const j = await (await fetch("/api/reflect", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ grateful: body.trim().slice(0, 900) || "(grateful)", win: win.trim(), mood: "🙂 Good", date: todayStr() }),
+        })).json();
+        if (j.error) throw new Error(j.error);
+        xp(10, true); say("Gratitude logged. +10 XP 🙏"); setBody(""); setWin("");
+      } catch { say("Couldn't save — try again"); }
+      setBusy(false);
+      return;
+    }
+    if (!title.trim()) { say(mode === "goal" ? "Give your goal a name first 🎯" : "Name the dream first 🌌"); return; }
+    setBusy(true);
     try {
-      const j = await (await fetch("/api/content")).json();
+      const j = await (await fetch("/api/journal", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: mode, title: title.trim(), area, body: body.trim() }),
+      })).json();
       if (j.error) throw new Error(j.error);
-      setPosts(j.posts);
-    } catch (e) { setErr(e.message); }
-  }, []);
-  useEffect(() => { load(); }, [load]);
-
-  async function setStatus(p, status) {
-    setPosts((ps) => ps.map((x) => (x.id === p.id ? { ...x, status } : x)));
-    say(status === "✅ Posted" ? "Marked posted ✅" : "Scheduled 📅");
-    await fetch("/api/content", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: p.id, status }) });
+      xp(10, true); say((mode === "goal" ? "Goal" : "Dream") + " saved to Notion. +10 XP 🎯");
+      setTitle(""); setBody("");
+    } catch { say("Couldn't save — try again"); }
+    setBusy(false);
   }
-  async function copy(p) {
-    const full = p.caption + (p.hashtags ? "\n\n" + p.hashtags : "");
-    try { await navigator.clipboard.writeText(full); say("Copied — go post it 🚀"); }
-    catch { say("Couldn't copy"); }
-  }
-
-  const pending = posts?.filter((p) => p.status === "💡 Idea" || p.status === "✍️ Drafted") || [];
-  const done = posts?.filter((p) => p.status === "📅 Scheduled" || p.status === "✅ Posted") || [];
 
   return (
     <>
       <section>
-        <h2>📣 Ready to post <span className="sub">{pending.length} waiting</span></h2>
-        {err && <p className="err">{err}</p>}
-        {!posts && !err && <div className="skel" />}
-        {posts && !pending.length && <p className="empty">Nothing waiting — new captions arrive every Monday morning. ✍️</p>}
-        {pending.map((p) => (
-          <div className="post" key={p.id}>
-            <button className="posthead" onClick={() => setOpen(open === p.id ? null : p.id)}>
-              <b>{p.hook}</b>
-              <span className="sub">{p.platforms.join(" · ") || p.source}</span>
-            </button>
-            {open === p.id && (
-              <div className="postbody">
-                <p className="rp">{p.caption}</p>
-                {p.hashtags && <p className="tags">{p.hashtags}</p>}
-                <div className="tbtns" style={{ justifyContent: "flex-start" }}>
-                  <button className="btn" onClick={() => copy(p)}>📋 Copy</button>
-                  <button className="btn sec" onClick={() => setStatus(p, "📅 Scheduled")}>📅 Scheduled</button>
-                  <button className="btn sec" onClick={() => setStatus(p, "✅ Posted")}>✅ Posted</button>
-                </div>
-              </div>
-            )}
-          </div>
-        ))}
-      </section>
-      {done.length > 0 && (
-        <section>
-          <h2>✅ Handled <span className="sub">{done.length}</span></h2>
-          {done.slice(0, 10).map((p) => (
-            <div className="mrow" key={p.id}><span className="mi">{p.hook}</span><span className="sub">{p.status}</span></div>
+        <h2>📝 Journal <span className="sub">write it into existence</span></h2>
+        <div className="modes">
+          {[["goal", "🎯 Goal"], ["dream", "🌌 Dream"], ["gratitude", "🙏 Gratitude"]].map(([m, l]) => (
+            <button key={m} className={"modechip" + (mode === m ? " on" : "")} onClick={() => { setMode(m); }}>{l}</button>
           ))}
-        </section>
-      )}
+        </div>
+        {mode !== "gratitude" && (
+          <>
+            <input value={title} onChange={(e) => setTitle(e.target.value)}
+              placeholder={mode === "goal" ? "Name the goal (e.g. Hit $10k/mo by December)" : "Name the dream (e.g. Beach house + business that runs itself)"} />
+            <div className="modes" style={{ flexWrap: "wrap" }}>
+              {AREAS.map((a) => (
+                <button key={a} className={"modechip" + (area === a ? " on" : "")} onClick={() => setArea(a)}>{a}</button>
+              ))}
+            </div>
+          </>
+        )}
+        <div className="chartlbl">Need a spark? Tap a question — it drops into your page:</div>
+        <div className="prompts">
+          {PROMPTS[mode].map((q) => (
+            <button key={q} className="prompt" onClick={() => usePrompt(q)}>{q}</button>
+          ))}
+        </div>
+        <div className="jwrap">
+          <textarea className="jtext" value={body} onChange={(e) => setBody(e.target.value)}
+            placeholder={mode === "gratitude" ? "What are you grateful for today?" : "Write freely — this saves into the page in Notion…"} />
+          <button className={"micbtn" + (voice.listening ? " live" : "")} onClick={voice.toggle}
+            title={voice.supported ? "Voice to text" : "Use your keyboard's 🎤 dictation"}>
+            {voice.listening ? "⏺ Listening…" : "🎤 Voice"}
+          </button>
+        </div>
+        {!voice.supported && <p className="empty">Tip: your phone keyboard&rsquo;s 🎤 button dictates into any box here too.</p>}
+        {mode === "gratitude" && (
+          <input value={win} onChange={(e) => setWin(e.target.value)} placeholder="One win today 🏆 (optional)" />
+        )}
+        <button className="btn" disabled={busy} onClick={save}>{busy ? "Saving…" : "Save to Notion (+10 XP)"}</button>
+      </section>
+      <section>
+        <h2>💡 How this works</h2>
+        <p className="empty">
+          🎯 Goals save as <b>Active</b> and 🌌 Dreams as <b>Dreaming</b> in your Goals &amp; Dreams database — your writing becomes the page body. 🙏 Gratitude goes to Gratitude &amp; Wins. Everything shows up in Notion instantly.
+        </p>
+      </section>
     </>
   );
 }
