@@ -1,6 +1,6 @@
-import { notion, DB, PROP } from "../../lib/notion";
+import { notion } from "../../lib/notion";
 
-// POST /api/complete  { id }  ->  marks a task Done
+// POST /api/complete { id } -> marks a task ✅ Done
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
   const { id } = req.body || {};
@@ -8,7 +8,7 @@ export default async function handler(req, res) {
   try {
     await notion.pages.update({
       page_id: id,
-      properties: { [PROP.todoStatus]: { select: { name: PROP.doneValue } } },
+      properties: { Status: { select: { name: "✅ Done" } } },
     });
     res.status(200).json({ ok: true });
   } catch (e) {

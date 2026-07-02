@@ -1,31 +1,29 @@
-import { notion, DB, PROP, titleText, richText } from "../../lib/notion";
+import { notion, DB, titleText, text, sel, queryAll } from "../../lib/notion";
 
-// GET /api/today  ->  { tasks: [...], quote: {...} }
+// GET /api/today -> { tasks: [...], quote: {...} }
 export default async function handler(req, res) {
   try {
-    // Today's open tasks (Status != Done).
-    const tasks = await notion.databases.query({ database_id: DB.todo, page_size: 25 });
-    const open = tasks.results
-      .filter((p) => {
-        const val = p.properties?.[PROP.todoStatus]?.select?.name || "";
-        return val !== PROP.doneValue;
-      })
-      .map((p) => ({ id: p.id, title: titleText(p) }));
+    const taskPages = await queryAll(DB.todo, {
+      filter: { property: "Status", select: { equals: "🔥 Today" } },
+    });
+    const tasks = taskPages.map((p) => ({
+      id: p.id,
+      title: titleText(p),
+      step: text(p, "Smallest Next Step"),
+      priority: sel(p, "Priority"),
+      energy: sel(p, "Energy"),
+    }));
 
-    // A random favorite quote (falls back to any quote).
-    const q = await notion.databases.query({ database_id: DB.quotes, page_size: 100 });
-    const all = q.results
-      .map((p) => ({
-        quote: richText(p.properties?.[PROP.quote]),
-        author: richText(p.properties?.[PROP.author]),
-        fav: !!p.properties?.[PROP.favorite]?.checkbox,
-      }))
-      .filter((x) => x.quote);
-    const favs = all.filter((x) => x.fav);
-    const pool = favs.length ? favs : all;
-    const quote = pool.length ? pool[Math.floor(Math.random() * pool.length)] : null;
+    const favs = await queryAll(DB.quotes, {
+      filter: { property: "⭐ Favorite", checkbox: { equals: true } },
+    });
+    const pool = favs.length
+      ? favs
+      : await queryAll(DB.quotes, {}, 100);
+    const pick = pool.length ? pool[Math.floor(Math.random() * pool.length)] : null;
+    const quote = pick ? { quote: titleText(pick), author: text(pick, "Author") } : null;
 
-    res.status(200).json({ tasks: open, quote });
+    res.status(200).json({ tasks, quote });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

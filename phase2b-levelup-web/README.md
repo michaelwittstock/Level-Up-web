@@ -1,60 +1,35 @@
-# Personal Level Up — Public Web App (Phase 2b)
+# Personal Level Up — Full Web App (v2)
 
-A tiny Next.js app that shows your **Today** tasks + a favorite quote from your Notion hub,
-on a real URL you can open from any phone browser (no Cowork needed). This is a starter you
-can grow into the full app.
+The complete Level Up app on your public URL: **Today** (tasks + quote), **75 Hard**
+(check off all 7 daily items), **Focus** (Pomodoro + 45-min workout timer), **Learn**
+(Your ONE, quotes shuffle, courses, library), **Reflect** (gratitude + goals) — with
+XP, levels, and streak, in the SF90 blue/yellow/carbon look. Reads and writes your
+Notion live.
 
-It already has your database IDs filled in. You just need to (1) create a Notion token,
-(2) share your hub with it, and (3) deploy to Vercel.
+## How to ship this update (2 minutes)
 
----
+Your GitHub repo `Level-Up-web` already auto-deploys to Vercel, so:
 
-## Step 1 — Create a Notion integration token (2 min)
+1. Open https://github.com/michaelwittstock/Level-Up-web
+2. Click **Add file → Upload files**
+3. Drag in ALL the contents of this folder (package.json, `pages/`, `lib/`, `styles/`,
+   next.config.js) — GitHub replaces the old versions of files with the same names
+4. **Commit changes** → Vercel rebuilds automatically (~1 min) → refresh your site
 
-1. Go to **https://www.notion.so/my-integrations** → **New integration**.
-2. Name it "Level Up App", pick your workspace, type **Internal**. Create it.
-3. Copy the **Internal Integration Secret** (starts with `secret_` or `ntn_`).
+Everything else (NOTION_TOKEN, framework preset) is already set up from v1.
 
-## Step 2 — Share your hub with the integration (1 min)
+## What's inside
 
-1. Open your **Personal Level Up** page in Notion.
-2. Top-right **•••** menu → **Connections** → **Connect to** → pick "Level Up App".
-3. This gives it read/write access to the page and every database inside it.
+- `pages/index.js` — the whole 5-tab app (XP/streak stored in your browser)
+- `pages/api/today.js` — 🔥 Today tasks + favorite quote
+- `pages/api/complete.js` — mark task ✅ Done
+- `pages/api/routines.js` — routines list + check-off (streak bump)
+- `pages/api/h75.js` — today's 75 Hard row + toggle the 7 items
+- `pages/api/learn.js` — quotes, Your ONE (🎯 Focus), courses, library
+- `pages/api/reflect.js` — goals + log gratitude/wins
+- `lib/notion.js` — Notion client, your database IDs, helpers
 
-## Step 3 — Deploy to Vercel (5 min)
+## If a section shows an error
 
-**Easiest path (no terminal):**
-1. Put this folder in a GitHub repo (drag-and-drop upload works at github.com/new).
-2. Go to **https://vercel.com** → sign in with GitHub → **Add New → Project** → import the repo.
-3. Before deploying, open **Environment Variables** and add:
-   - Name: `NOTION_TOKEN`  ·  Value: *(the secret from Step 1)*
-4. Click **Deploy**. In ~1 minute you get a URL like `levelup-web.vercel.app`.
-5. Open it on your phone → Share → **Add to Home Screen**. Done.
-
-**Prefer the terminal?**
-```bash
-npm install
-cp .env.local.example .env.local   # then paste your token into .env.local
-npm run dev                          # test locally at http://localhost:3000
-npx vercel                           # deploy (follow prompts; add NOTION_TOKEN when asked)
-```
-
----
-
-## If something doesn't load
-
-- **Empty tasks or quote?** Open `lib/notion.js` and check the `PROP` names match your
-  Notion columns exactly (emoji included). Adjust and redeploy.
-- **401 / unauthorized?** The integration isn't connected to the page (redo Step 2), or the
-  `NOTION_TOKEN` env var is missing/typo'd in Vercel.
-- **Nothing at all?** Make sure `NOTION_TOKEN` has no quotes or spaces around it.
-
-## What's here / what's next
-
-- `pages/index.js` — the Today screen (tasks + quote, tap ○ to complete).
-- `pages/api/today.js` — reads open tasks + a favorite quote from Notion.
-- `pages/api/complete.js` — marks a task Done.
-- `lib/notion.js` — Notion client, your DB IDs, and the property-name config.
-
-Next additions (say the word and I'll build them): routines check-off, 75 Hard tracker,
-the Learn tab with your ONE, XP/streak, and the full SF90 styling from the Cowork app.
+That property name probably changed in Notion. Open `lib/notion.js` / the matching
+`pages/api/*.js` and make sure names match your Notion columns exactly (emoji included).
