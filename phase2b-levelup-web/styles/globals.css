@@ -215,3 +215,21 @@ hr { border: none; border-top: 1px solid var(--line); margin: 12px 0; }
 .mi { font-weight: 650; }
 .mval { background: var(--panel2); border: 1px solid var(--line); color: var(--yellow); font-weight: 800; padding: 5px 10px; border-radius: 8px; cursor: pointer; }
 .medit { display: flex; gap: 6px; align-items: center; }
+
+/* stats charts */
+.chartlbl { color: var(--mut); font-size: 0.75rem; font-weight: 700; margin: 10px 0 6px; }
+.chart { display: flex; align-items: flex-end; gap: 4px; height: 90px; padding: 4px 0 16px; position: relative; }
+.cbarwrap { flex: 1; display: flex; align-items: flex-end; justify-content: center; gap: 2px; height: 100%; position: relative; }
+.cbar { width: 45%; min-height: 2px; border-radius: 3px 3px 0 0; }
+.sleepb { background: var(--blue); opacity: 0.75; }
+.energyb { background: var(--yellow); }
+.h75b { background: var(--blue2); width: 70%; }
+.perfb { background: var(--yellow); width: 70%; box-shadow: 0 0 8px rgba(245, 197, 24, 0.5); }
+.cday { position: absolute; bottom: -14px; font-size: 0.58rem; color: var(--mut); }
+
+/* content engine */
+.post { background: var(--panel2); border: 1px solid var(--line); border-radius: 11px; margin-bottom: 8px; overflow: hidden; }
+.posthead { display: block; width: 100%; text-align: left; background: transparent; border: none; color: var(--tx); padding: 12px 14px; cursor: pointer; }
+.posthead b { display: block; font-size: 0.92rem; }
+.postbody { padding: 0 14px 12px; border-top: 1px solid var(--line); }
+.tags { color: var(--blue2); font-size: 0.8rem; word-break: break-word; }

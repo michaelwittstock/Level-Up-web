@@ -8,6 +8,7 @@ const TABS = [
   ["focus", "⏱️ Focus"],
   ["learn", "📚 Learn"],
   ["reflect", "🙏 Reflect"],
+  ["content", "📣 Content"],
 ];
 
 function todayStr() {
@@ -95,6 +96,7 @@ export default function Home() {
         {tab === "focus" && <Focus xp={xp} say={say} S={S} save={save} />}
         {tab === "learn" && <Learn openPage={setReader} />}
         {tab === "reflect" && <Reflect xp={xp} say={say} />}
+        {tab === "content" && <Content say={say} />}
       </main>
 
       <footer className="foot">
@@ -546,6 +548,7 @@ function Reflect({ xp, say }) {
         <button className="btn" disabled={busy} onClick={saveGrat}>{busy ? "Saving…" : "Save (+10 XP)"}</button>
       </section>
       <EnergyLog xp={xp} say={say} />
+      <Stats />
       <Money say={say} />
       <section>
         <h2>🎯 Goals <span className="sub">{goals ? goals.length + " active" : "…"}</span></h2>
@@ -670,6 +673,128 @@ function Money({ say }) {
         </>
       )}
     </section>
+  );
+}
+
+// ================= STATS (14-day trends) =================
+function Stats() {
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState(null);
+  const load = useCallback(async () => {
+    setErr(null);
+    try {
+      const j = await (await fetch("/api/stats")).json();
+      if (j.error) throw new Error(j.error);
+      setData(j);
+    } catch (e) { setErr(e.message); }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const hasEnergy = data?.energy?.length > 0;
+  const hasH75 = data?.h75?.length > 0;
+  return (
+    <section>
+      <h2>📊 Last 14 days <span className="sub">trends</span></h2>
+      {err && <p className="empty">{err}</p>}
+      {!data && !err && <div className="skel" />}
+      {data && !hasEnergy && !hasH75 && <p className="empty">Log Energy &amp; Sleep and check off 75 Hard days — your charts grow here.</p>}
+      {hasEnergy && (
+        <>
+          <div className="chartlbl">⚡ Energy (1–10) &amp; 😴 sleep hrs</div>
+          <div className="chart">
+            {data.energy.map((d, i) => (
+              <div className="cbarwrap" key={i} title={d.day + " · sleep " + d.sleep + "h · energy " + d.energy}>
+                <div className="cbar sleepb" style={{ height: Math.min(100, (d.sleep / 10) * 100) + "%" }} />
+                <div className="cbar energyb" style={{ height: (d.energy / 10) * 100 + "%" }} />
+                <span className="cday">{(d.date || "").slice(8)}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+      {hasH75 && (
+        <>
+          <div className="chartlbl">🔥 75 Hard — items done per day (7 = perfect)</div>
+          <div className="chart">
+            {data.h75.map((d, i) => (
+              <div className="cbarwrap" key={i} title={d.day + " · " + d.done + "/7"}>
+                <div className={"cbar " + (d.done === 7 ? "perfb" : "h75b")} style={{ height: (d.done / 7) * 100 + "%" }} />
+                <span className="cday">{(d.date || "").slice(8)}</span>
+              </div>
+            ))}
+          </div>
+          <p className="empty">{data.h75.filter((d) => d.done === 7).length} perfect day{data.h75.filter((d) => d.done === 7).length === 1 ? "" : "s"} in this window.</p>
+        </>
+      )}
+    </section>
+  );
+}
+
+// ================= CONTENT ENGINE =================
+function Content({ say }) {
+  const [posts, setPosts] = useState(null);
+  const [err, setErr] = useState(null);
+  const [open, setOpen] = useState(null); // id
+  const load = useCallback(async () => {
+    setErr(null);
+    try {
+      const j = await (await fetch("/api/content")).json();
+      if (j.error) throw new Error(j.error);
+      setPosts(j.posts);
+    } catch (e) { setErr(e.message); }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  async function setStatus(p, status) {
+    setPosts((ps) => ps.map((x) => (x.id === p.id ? { ...x, status } : x)));
+    say(status === "✅ Posted" ? "Marked posted ✅" : "Scheduled 📅");
+    await fetch("/api/content", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: p.id, status }) });
+  }
+  async function copy(p) {
+    const full = p.caption + (p.hashtags ? "\n\n" + p.hashtags : "");
+    try { await navigator.clipboard.writeText(full); say("Copied — go post it 🚀"); }
+    catch { say("Couldn't copy"); }
+  }
+
+  const pending = posts?.filter((p) => p.status === "💡 Idea" || p.status === "✍️ Drafted") || [];
+  const done = posts?.filter((p) => p.status === "📅 Scheduled" || p.status === "✅ Posted") || [];
+
+  return (
+    <>
+      <section>
+        <h2>📣 Ready to post <span className="sub">{pending.length} waiting</span></h2>
+        {err && <p className="err">{err}</p>}
+        {!posts && !err && <div className="skel" />}
+        {posts && !pending.length && <p className="empty">Nothing waiting — new captions arrive every Monday morning. ✍️</p>}
+        {pending.map((p) => (
+          <div className="post" key={p.id}>
+            <button className="posthead" onClick={() => setOpen(open === p.id ? null : p.id)}>
+              <b>{p.hook}</b>
+              <span className="sub">{p.platforms.join(" · ") || p.source}</span>
+            </button>
+            {open === p.id && (
+              <div className="postbody">
+                <p className="rp">{p.caption}</p>
+                {p.hashtags && <p className="tags">{p.hashtags}</p>}
+                <div className="tbtns" style={{ justifyContent: "flex-start" }}>
+                  <button className="btn" onClick={() => copy(p)}>📋 Copy</button>
+                  <button className="btn sec" onClick={() => setStatus(p, "📅 Scheduled")}>📅 Scheduled</button>
+                  <button className="btn sec" onClick={() => setStatus(p, "✅ Posted")}>✅ Posted</button>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </section>
+      {done.length > 0 && (
+        <section>
+          <h2>✅ Handled <span className="sub">{done.length}</span></h2>
+          {done.slice(0, 10).map((p) => (
+            <div className="mrow" key={p.id}><span className="mi">{p.hook}</span><span className="sub">{p.status}</span></div>
+          ))}
+        </section>
+      )}
+    </>
   );
 }
 
