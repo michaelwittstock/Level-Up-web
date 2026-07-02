@@ -17,8 +17,6 @@ function todayStr() {
 function mmss(s) {
   return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
 }
-
-// ---- persistent XP / streak (localStorage) ----
 function loadS() {
   if (typeof window === "undefined") return { xp: 0, streak: 0, lastDay: "", wins: 0, pomo: 0, pomoDay: "" };
   try {
@@ -32,19 +30,18 @@ export default function Home() {
   const [tab, setTab] = useState("today");
   const [S, setS] = useState(loadS);
   const [toast, setToast] = useState("");
+  const [reader, setReader] = useState(null); // {id, title}
   const toastT = useRef(null);
 
   const save = useCallback((next) => {
     setS(next);
     try { localStorage.setItem("levelup-web", JSON.stringify(next)); } catch {}
   }, []);
-
   const say = useCallback((m) => {
     setToast(m);
     clearTimeout(toastT.current);
     toastT.current = setTimeout(() => setToast(""), 2000);
   }, []);
-
   const xp = useCallback((n, winToo) => {
     setS((prev) => {
       const t = todayStr();
@@ -94,9 +91,9 @@ export default function Home() {
 
       <main>
         {tab === "today" && <Today xp={xp} say={say} />}
-        {tab === "h75" && <H75 xp={xp} say={say} />}
+        {tab === "h75" && <H75 xp={xp} say={say} openPage={setReader} />}
         {tab === "focus" && <Focus xp={xp} say={say} S={S} save={save} />}
-        {tab === "learn" && <Learn />}
+        {tab === "learn" && <Learn openPage={setReader} />}
         {tab === "reflect" && <Reflect xp={xp} say={say} />}
       </main>
 
@@ -105,6 +102,74 @@ export default function Home() {
         <a href="https://app.notion.com/p/390fcb70586381878204cfabca02ad93" target="_blank" rel="noopener noreferrer">Open hub ↗</a>
       </footer>
       {toast && <div className="toast show">{toast}</div>}
+      {reader && <Reader id={reader.id} fallbackTitle={reader.title} close={() => setReader(null)} say={say} />}
+    </div>
+  );
+}
+
+// ================= READER (in-app page view + notes) =================
+function Reader({ id, fallbackTitle, close, say }) {
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState(null);
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    setErr(null);
+    try {
+      const j = await (await fetch("/api/page?id=" + encodeURIComponent(id))).json();
+      if (j.error) throw new Error(j.error);
+      setData(j);
+    } catch (e) { setErr(e.message); }
+  }, [id]);
+  useEffect(() => { load(); }, [load]);
+
+  async function toggleTodo(b) {
+    setData((d) => ({ ...d, blocks: d.blocks.map((x) => (x.id === b.id ? { ...x, checked: !b.checked } : x)) }));
+    await fetch("/api/page", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ blockId: b.id, checked: !b.checked }) });
+  }
+  async function addNote() {
+    if (!note.trim()) return;
+    setBusy(true);
+    try {
+      const j = await (await fetch("/api/page", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pageId: id, note: note.trim() }) })).json();
+      if (j.error) throw new Error(j.error);
+      say("Note saved to Notion 📝"); setNote(""); load();
+    } catch { say("Couldn't save note"); }
+    setBusy(false);
+  }
+
+  return (
+    <div className="overlay" onClick={close}>
+      <div className="sheet" onClick={(e) => e.stopPropagation()}>
+        <div className="sheet-head">
+          <b>{data?.title || fallbackTitle || "…"}</b>
+          <button className="btn sec" onClick={close}>✕</button>
+        </div>
+        <div className="sheet-body">
+          {err && <p className="err">{err}</p>}
+          {!data && !err && <div className="skel" />}
+          {data?.blocks?.map((b, i) => {
+            if (b.kind === "hr") return <hr key={i} />;
+            if (b.kind === "h1") return <h3 key={i} className="rh1">{b.text}</h3>;
+            if (b.kind === "h2") return <h4 key={i} className="rh2">{b.text}</h4>;
+            if (b.kind === "h3") return <h4 key={i} className="rh3" style={{ marginLeft: b.indent ? 12 : 0 }}>{b.text}</h4>;
+            if (b.kind === "li" || b.kind === "nli") return <div key={i} className="rli" style={{ marginLeft: b.indent ? 26 : 14 }}>• {b.text}</div>;
+            if (b.kind === "quote" || b.kind === "callout") return <div key={i} className="rquote">{b.text}</div>;
+            if (b.kind === "todo") return (
+              <button key={i} className={"rtodo" + (b.checked ? " on" : "")} onClick={() => toggleTodo(b)}>
+                <span className="box">✓</span>{b.text}
+              </button>
+            );
+            return <p key={i} className="rp" style={{ marginLeft: b.indent ? 12 : 0 }}>{b.text}</p>;
+          })}
+          {data && !data.blocks?.length && <p className="empty">This page is empty.</p>}
+        </div>
+        <div className="sheet-foot">
+          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Add a note to this page…" />
+          <button className="btn" disabled={busy} onClick={addNote}>{busy ? "…" : "Save"}</button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -113,6 +178,9 @@ export default function Home() {
 function Today({ xp, say }) {
   const [data, setData] = useState(null);
   const [err, setErr] = useState(null);
+  const [routines, setRoutines] = useState(null);
+  const [cal, setCal] = useState(undefined);
+
   const load = useCallback(async () => {
     setErr(null);
     try {
@@ -120,6 +188,14 @@ function Today({ xp, say }) {
       if (j.error) throw new Error(j.error);
       setData(j);
     } catch (e) { setErr(e.message); }
+    try {
+      const r = await (await fetch("/api/routines")).json();
+      if (!r.error) setRoutines(r.routines);
+    } catch {}
+    try {
+      const c = await (await fetch("/api/calendar")).json();
+      setCal(c.events); // null = not configured
+    } catch { setCal(null); }
   }, []);
   useEffect(() => { load(); }, [load]);
 
@@ -128,16 +204,43 @@ function Today({ xp, say }) {
     xp(15, true); say("+15 XP 💪");
     await fetch("/api/complete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
   }
+  async function toggleRoutine(r) {
+    const on = !r.done;
+    const streak = on ? (r.streak || 0) + 1 : r.streak;
+    setRoutines((rs) => rs.map((x) => (x.id === r.id ? { ...x, done: on, streak } : x)));
+    if (on) { xp(5, false); say("+5 XP · 🔥" + streak); }
+    await fetch("/api/routines", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: r.id, on, streak }) });
+  }
+
+  const groups = routines
+    ? [
+        ["🌅 Morning — incl. Million Dollar Morning", routines.filter((r) => (r.when || "").includes("Morning"))],
+        ["⚔️ Warrior Core 4", routines.filter((r) => (r.when || "").includes("Anytime"))],
+        ["🌇 Evening", routines.filter((r) => (r.when || "").includes("Evening"))],
+      ]
+    : [];
 
   return (
     <>
       {err && <Err retry={load} msg={err} />}
       {!data && !err && <Skel />}
       {data?.quote && (
-        <blockquote className="quote">
-          &ldquo;{data.quote.quote}&rdquo;
-          <cite>&mdash; {data.quote.author || "Unknown"}</cite>
-        </blockquote>
+        <blockquote className="quote">&ldquo;{data.quote.quote}&rdquo;<cite>&mdash; {data.quote.author || "Unknown"}</cite></blockquote>
+      )}
+      {cal !== undefined && cal !== null && cal.length > 0 && (
+        <section>
+          <h2>📅 Coming up <span className="sub">next 3 days</span></h2>
+          {cal.map((e, i) => (
+            <div className="calrow" key={i}>
+              <span className="when">{e.allDay ? "all day" : new Date(e.start).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}</span>
+              <span className="ev">{e.summary}</span>
+              <span className="sub">{dayLabel(e.start)}</span>
+            </div>
+          ))}
+        </section>
+      )}
+      {cal === null && (
+        <p className="empty" style={{ margin: "0 0 12px" }}>📅 Calendar not connected yet — add your Google Calendar secret iCal URL as <code>GOOGLE_CAL_ICS</code> in Vercel (see README).</p>
       )}
       {data && (
         <section>
@@ -158,14 +261,38 @@ function Today({ xp, say }) {
           ))}
         </section>
       )}
+      {groups.map(([label, list]) =>
+        list.length ? (
+          <section key={label}>
+            <h2>{label} <span className="sub">{list.filter((r) => r.done).length}/{list.length}</span></h2>
+            {list.map((r) => (
+              <button key={r.id} className={"hrow" + (r.done ? " on" : "")} onClick={() => toggleRoutine(r)}>
+                <span className="box">✓</span>
+                <span className="hn">{r.habit}</span>
+                {r.streak > 0 && <span className="flame">🔥{r.streak}</span>}
+              </button>
+            ))}
+          </section>
+        ) : null
+      )}
     </>
   );
 }
+function dayLabel(start) {
+  const d = new Date(start), now = new Date();
+  if (d.toDateString() === now.toDateString()) return "Today";
+  const tm = new Date(now.getTime() + 86400000);
+  if (d.toDateString() === tm.toDateString()) return "Tmrw";
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
 
 // ================= 75 HARD =================
-function H75({ xp, say }) {
+function H75({ xp, say, openPage }) {
   const [row, setRow] = useState(undefined);
   const [err, setErr] = useState(null);
+  const [plans, setPlans] = useState(undefined);
+  const [openPlan, setOpenPlan] = useState(0);
+
   const load = useCallback(async () => {
     setErr(null);
     try {
@@ -173,13 +300,17 @@ function H75({ xp, say }) {
       if (j.error) throw new Error(j.error);
       setRow(j.row);
     } catch (e) { setErr(e.message); }
+    try {
+      const w = await (await fetch("/api/workouts")).json();
+      setPlans(w.error ? { error: w.error } : w.plans);
+    } catch (e) { setPlans({ error: e.message }); }
   }, []);
   useEffect(() => { load(); }, [load]);
 
   async function toggle(item) {
     const on = !item.on;
     setRow((r) => ({ ...r, items: r.items.map((i) => (i.prop === item.prop ? { ...i, on } : i)) }));
-    if (on) { xp(4, false); }
+    if (on) xp(4, false);
     await fetch("/api/h75", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: row.id, prop: item.prop, on }) });
     const doneNow = row.items.filter((i) => (i.prop === item.prop ? on : i.on)).length;
     if (doneNow === 7) { xp(0, true); say("Perfect day. Unbreakable. 🔥"); }
@@ -205,11 +336,29 @@ function H75({ xp, say }) {
           <p className="empty">{done === 7 ? "Perfect day. Unbreakable. 🔥" : "Check off all 7. Miss one → back to Day 1."}</p>
         </section>
       )}
+      <section>
+        <h2>💪 Workouts <span className="sub">from your Fitness page</span></h2>
+        {plans === undefined && <div className="skel" />}
+        {plans?.error && <p className="empty">{plans.error}</p>}
+        {Array.isArray(plans) && !plans.length && <p className="empty">No workout plans found on the Fitness page.</p>}
+        {Array.isArray(plans) && plans.map((p, pi) => (
+          <div key={pi}>
+            <button className="planhead" onClick={() => setOpenPlan(openPlan === pi ? -1 : pi)}>
+              {openPlan === pi ? "▾" : "▸"} {p.name}
+            </button>
+            {openPlan === pi && p.days.map((d) => (
+              <button key={d.id} className="lrow full" onClick={() => openPage({ id: d.id, title: d.title })}>
+                <div className="lt"><b>{d.title}</b></div><span className="badge">Open</span>
+              </button>
+            ))}
+          </div>
+        ))}
+      </section>
     </>
   );
 }
 
-// ================= FOCUS (timers) =================
+// ================= FOCUS =================
 function useTimer(total, onDone) {
   const [remaining, setRemaining] = useState(total);
   const [running, setRunning] = useState(false);
@@ -246,7 +395,6 @@ function Focus({ xp, say, S, save }) {
     else say("Break over — back to it 💪");
   });
   const work = useTimer(45 * 60, () => { xp(20, true); say("Workout complete! +20 XP 🔥 Check it in 75 Hard"); });
-
   function pick(m) { setMode(m); pomo.reset(m * 60); }
   const pomoCount = S.pomoDay === todayStr() ? S.pomo : 0;
 
@@ -278,7 +426,7 @@ function Focus({ xp, say, S, save }) {
 }
 
 // ================= LEARN =================
-function Learn() {
+function Learn({ openPage }) {
   const [data, setData] = useState(null);
   const [err, setErr] = useState(null);
   const [q, setQ] = useState(null);
@@ -296,6 +444,15 @@ function Learn() {
   function shuffle() {
     if (data?.quotes?.length) setQ(data.quotes[Math.floor(Math.random() * data.quotes.length)]);
   }
+  const Row = ({ id, title, subtitle, badge, notionUrl }) => (
+    <div className="lrow">
+      <button className="ltbtn" onClick={() => openPage({ id, title })}>
+        <div className="lt"><b>{title}</b><span>{subtitle}</span></div>
+      </button>
+      <span className="badge">{badge}</span>
+      <a className="mini" href={notionUrl} target="_blank" rel="noopener noreferrer">↗</a>
+    </div>
+  );
 
   return (
     <>
@@ -305,16 +462,9 @@ function Learn() {
         <>
           <section>
             <h2>🎯 Your ONE <span className="sub">{data.one.books.length + data.one.courses.length} focused</span></h2>
-            {data.one.books.map((b) => (
-              <a key={b.id} className="lrow" href={b.url} target="_blank" rel="noopener noreferrer">
-                <div className="lt"><b>📖 {b.title}</b><span>{b.author}</span></div><span className="badge">Book</span>
-              </a>
-            ))}
-            {data.one.courses.map((c) => (
-              <a key={c.id} className="lrow" href={c.url} target="_blank" rel="noopener noreferrer">
-                <div className="lt"><b>🎧 {c.course}</b><span>{c.instructor}</span></div><span className="badge">Course</span>
-              </a>
-            ))}
+            {data.one.books.map((b) => <Row key={b.id} id={b.id} title={"📖 " + b.title} subtitle={b.author} badge="Book" notionUrl={b.url} />)}
+            {data.one.courses.map((c) => <Row key={c.id} id={c.id} title={"🎧 " + c.course} subtitle={c.instructor} badge="Course" notionUrl={c.url} />)}
+            <p className="empty" style={{ marginTop: 6 }}>Tap a title to read it here · ↗ opens Notion</p>
           </section>
           {q && (
             <section>
@@ -327,21 +477,18 @@ function Learn() {
             <h2>📚 Courses <span className="sub">{data.courses.filter((c) => c.status.includes("Completed")).length}/{data.courses.length} done</span></h2>
             <div className="scroll">
               {data.courses.map((c) => (
-                <a key={c.id} className="lrow" href={c.url} target="_blank" rel="noopener noreferrer">
-                  <div className="lt"><b>{c.course}</b><span>{c.instructor}{c.category ? " · " + c.category : ""}</span></div>
-                  <span className="badge">{c.status.includes("Completed") ? "Done" : c.status.includes("progress") ? "Active" : "New"}</span>
-                </a>
+                <Row key={c.id} id={c.id} title={c.course} subtitle={(c.instructor || "") + (c.category ? " · " + c.category : "")}
+                  badge={c.status.includes("Completed") ? "Done" : c.status.includes("progress") ? "Active" : "New"} notionUrl={c.url} />
               ))}
             </div>
           </section>
           <section>
             <h2>📖 Library <span className="sub">{data.books.filter((b) => b.status.includes("Finished")).length}/{data.books.length} read</span></h2>
+            <p className="empty" style={{ margin: "0 0 8px" }}>Tap a book → its summary, lessons &amp; quiz open right here.</p>
             <div className="scroll">
               {data.books.map((b) => (
-                <a key={b.id} className="lrow" href={b.url} target="_blank" rel="noopener noreferrer">
-                  <div className="lt"><b>{b.title}</b><span>{b.author}</span></div>
-                  <span className="badge">{b.status.includes("Finished") ? "Read" : b.status.includes("Reading") ? "Now" : "To read"}</span>
-                </a>
+                <Row key={b.id} id={b.id} title={b.title} subtitle={b.author}
+                  badge={b.status.includes("Finished") ? "Read" : b.status.includes("Reading") ? "Now" : "To read"} notionUrl={b.url} />
               ))}
             </div>
           </section>
@@ -413,12 +560,7 @@ function Reflect({ xp, say }) {
   );
 }
 
-// ================= shared bits =================
 function Err({ retry, msg }) {
-  return (
-    <p className="err">Couldn&rsquo;t reach Notion ({msg}). <button className="btn sec" onClick={retry}>⟳ Retry</button></p>
-  );
+  return <p className="err">Couldn&rsquo;t reach Notion ({msg}). <button className="btn sec" onClick={retry}>⟳ Retry</button></p>;
 }
-function Skel() {
-  return <div className="skel" />;
-}
+function Skel() { return <div className="skel" />; }

@@ -55,6 +55,26 @@ export function check(page, name) {
   return !!page.properties?.[name]?.checkbox;
 }
 
+// His Fitness page (under the "Michael Wittstock" page — the integration must be
+// connected to that page too, or /api/workouts will 404).
+export const FITNESS_PAGE = "37912bda5ed24775b570b66222c1661a";
+
+// List a block's children, following pagination.
+export async function blockChildren(block_id, cap = 300) {
+  let results = [];
+  let cursor = undefined;
+  do {
+    const r = await notion.blocks.children.list({ block_id, page_size: 100, start_cursor: cursor });
+    results = results.concat(r.results);
+    cursor = r.has_more ? r.next_cursor : undefined;
+  } while (cursor && results.length < cap);
+  return results;
+}
+
+export function plainText(rich) {
+  return (rich || []).map((t) => t.plain_text).join("");
+}
+
 // Query a database, following pagination (Notion caps page_size at 100).
 export async function queryAll(database_id, body = {}, cap = 500) {
   let results = [];

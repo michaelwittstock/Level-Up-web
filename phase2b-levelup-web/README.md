@@ -1,4 +1,26 @@
-# Personal Level Up — Full Web App (v2)
+# Personal Level Up — Full Web App (v3)
+
+## New in v3
+
+- **Today**: your routines — Morning (incl. Million Dollar Morning), Warrior Core 4,
+  Evening — with check-off + streaks, and a **📅 Coming up** calendar card
+- **75 Hard**: your 3 workout plans from the Fitness page — tap a day to see the
+  exercises in-app
+- **Learn**: tap any book/course → its summary, lessons & quiz open **inside the app**,
+  quiz checkboxes are tappable, and you can save notes back to the Notion page
+
+## v3 setup (two one-time steps)
+
+1. **Calendar** — Google Calendar (web) → ⚙️ Settings → click your calendar on the left →
+   **Integrate calendar** → copy **"Secret address in iCal format"** → in Vercel:
+   Settings → Environment Variables → add `GOOGLE_CAL_ICS` = that URL → Redeploy.
+   (Keep this URL private — anyone with it can read your calendar.)
+2. **Workouts** — in Notion, open your **"Michael Wittstock"** page → ••• menu →
+   **Connections** → add your **Level Up App** integration. (The Fitness page lives
+   under it, and the integration can only see pages it's connected to.)
+
+---
+
 
 The complete Level Up app on your public URL: **Today** (tasks + quote), **75 Hard**
 (check off all 7 daily items), **Focus** (Pomodoro + 45-min workout timer), **Learn**

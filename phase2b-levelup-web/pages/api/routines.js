@@ -1,4 +1,4 @@
-import { notion, DB, titleText, num, check, queryAll } from "../../lib/notion";
+import { notion, DB, titleText, sel, num, check, queryAll } from "../../lib/notion";
 
 // GET  /api/routines                        -> { routines: [...] }
 // POST /api/routines { id, on, streak }     -> toggles Done Today (+streak bump)
@@ -20,6 +20,7 @@ export default async function handler(req, res) {
     const routines = pages.map((p) => ({
       id: p.id,
       habit: titleText(p),
+      when: sel(p, "When"),
       done: check(p, "Done Today"),
       streak: num(p, "Streak 🔥"),
     }));
