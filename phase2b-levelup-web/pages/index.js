@@ -545,6 +545,8 @@ function Reflect({ xp, say }) {
         </div>
         <button className="btn" disabled={busy} onClick={saveGrat}>{busy ? "Saving…" : "Save (+10 XP)"}</button>
       </section>
+      <EnergyLog xp={xp} say={say} />
+      <Money say={say} />
       <section>
         <h2>🎯 Goals <span className="sub">{goals ? goals.length + " active" : "…"}</span></h2>
         {err && <Err retry={load} msg={err} />}
@@ -557,6 +559,117 @@ function Reflect({ xp, say }) {
         {goals && !goals.length && <p className="empty">No active goals yet.</p>}
       </section>
     </>
+  );
+}
+
+// ================= ENERGY & SLEEP =================
+function EnergyLog({ xp, say }) {
+  const [sleep, setSleep] = useState("");
+  const [energy, setEnergy] = useState(7);
+  const [mood, setMood] = useState("🙂 Good");
+  const [worked, setWorked] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  async function log() {
+    setBusy(true);
+    try {
+      const j = await (await fetch("/api/energy", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sleep: sleep === "" ? undefined : Number(sleep), energy, mood, workedOut: worked, date: todayStr() }),
+      })).json();
+      if (j.error) throw new Error(j.error);
+      xp(5, false); say("Energy logged. +5 XP 🔋"); setSleep("");
+    } catch { say("Couldn't log — try again"); }
+    setBusy(false);
+  }
+
+  return (
+    <section>
+      <h2>🔋 Energy &amp; Sleep <span className="sub">20 seconds</span></h2>
+      <div className="erow">
+        <label>😴 Sleep (hrs)</label>
+        <input className="enum" type="number" step="0.5" min="0" max="14" value={sleep} onChange={(e) => setSleep(e.target.value)} placeholder="7.5" />
+      </div>
+      <div className="erow">
+        <label>⚡ Energy: <b>{energy}</b>/10</label>
+        <input className="eslide" type="range" min="1" max="10" value={energy} onChange={(e) => setEnergy(Number(e.target.value))} />
+      </div>
+      <div className="moods">
+        {["😫 Drained", "😔 Low", "😐 Okay", "🙂 Good", "🤩 Great"].map((m) => (
+          <button key={m} className={"mood" + (mood === m ? " sel" : "")} onClick={() => setMood(m)}>{m.split(" ")[0]}</button>
+        ))}
+      </div>
+      <button className={"h75item" + (worked ? " on" : "")} style={{ width: "100%", marginBottom: 10 }} onClick={() => setWorked(!worked)}>
+        <span className="box">✓</span>Worked out today
+      </button>
+      <button className="btn" disabled={busy} onClick={log}>{busy ? "Saving…" : "Log today (+5 XP)"}</button>
+    </section>
+  );
+}
+
+// ================= MONEY =================
+function Money({ say }) {
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState(null);
+  const [editing, setEditing] = useState(null); // id
+  const [val, setVal] = useState("");
+
+  const load = useCallback(async () => {
+    setErr(null);
+    try {
+      const j = await (await fetch("/api/money")).json();
+      if (j.error) throw new Error(j.error);
+      setData(j);
+    } catch (e) { setErr(e.message); }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const fmt = (n) => "$" + Math.round(n).toLocaleString();
+
+  async function saveVal(item) {
+    const v = Number(val);
+    if (isNaN(v)) { setEditing(null); return; }
+    setEditing(null);
+    setData((d) => {
+      const items = d.items.map((x) => (x.id === item.id ? { ...x, value: v } : x));
+      const assets = items.filter((i) => i.type.includes("Asset")).reduce((s, i) => s + i.value, 0);
+      const liabilities = items.filter((i) => i.type.includes("Liability")).reduce((s, i) => s + i.value, 0);
+      return { items, assets, liabilities, net: assets - liabilities };
+    });
+    say("Updated 💰");
+    await fetch("/api/money", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: item.id, value: v }) });
+  }
+
+  return (
+    <section>
+      <h2>💰 Money <span className="sub">net worth</span></h2>
+      {err && <p className="empty">{err}</p>}
+      {!data && !err && <div className="skel" />}
+      {data && (
+        <>
+          <div className="networth">
+            <div><span className="sub">Net worth</span><b className={data.net >= 0 ? "pos" : "neg"}>{fmt(data.net)}</b></div>
+            <div><span className="sub">Assets</span><b className="pos">{fmt(data.assets)}</b></div>
+            <div><span className="sub">Debts</span><b className="neg">{fmt(data.liabilities)}</b></div>
+          </div>
+          {data.items.map((i) => (
+            <div className="mrow" key={i.id}>
+              <span className="mi">{i.type.includes("Asset") ? "🟢" : "🔴"} {i.item}</span>
+              {editing === i.id ? (
+                <span className="medit">
+                  <input className="enum" type="number" autoFocus value={val} onChange={(e) => setVal(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && saveVal(i)} />
+                  <button className="btn sec" onClick={() => saveVal(i)}>✓</button>
+                </span>
+              ) : (
+                <button className="mval" onClick={() => { setEditing(i.id); setVal(String(i.value || "")); }}>{fmt(i.value)}</button>
+              )}
+            </div>
+          ))}
+          <p className="empty" style={{ marginTop: 6 }}>Tap a value to update it.</p>
+        </>
+      )}
+    </section>
   );
 }
 

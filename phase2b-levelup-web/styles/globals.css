@@ -196,3 +196,22 @@ code { background: var(--panel2); padding: 1px 6px; border-radius: 5px; font-siz
 .rtodo.on { border-color: var(--blue); }
 .rtodo.on .box { background: var(--blue); border-color: var(--blue); color: #fff; }
 hr { border: none; border-top: 1px solid var(--line); margin: 12px 0; }
+
+/* energy log */
+.erow { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; font-size: 0.9rem; }
+.erow label { flex: 0 0 auto; color: var(--mut); font-weight: 650; }
+.enum { width: 90px; margin-bottom: 0; }
+.eslide { flex: 1; accent-color: var(--yellow); margin-bottom: 0; }
+
+/* money */
+.networth { display: flex; gap: 10px; margin-bottom: 12px; }
+.networth > div { flex: 1; background: var(--panel2); border-radius: 10px; padding: 10px 12px; }
+.networth span { display: block; font-size: 0.7rem; }
+.networth b { font-size: 1.05rem; }
+.pos { color: #4ade80; }
+.neg { color: #f87171; }
+.mrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 2px; border-bottom: 1px solid var(--line); font-size: 0.88rem; }
+.mrow:last-of-type { border-bottom: none; }
+.mi { font-weight: 650; }
+.mval { background: var(--panel2); border: 1px solid var(--line); color: var(--yellow); font-weight: 800; padding: 5px 10px; border-radius: 8px; cursor: pointer; }
+.medit { display: flex; gap: 6px; align-items: center; }
