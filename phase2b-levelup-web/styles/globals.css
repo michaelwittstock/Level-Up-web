@@ -225,7 +225,22 @@ hr { border: none; border-top: 1px solid var(--line); margin: 12px 0; }
 .energyb { background: var(--yellow); }
 .h75b { background: var(--blue2); width: 70%; }
 .perfb { background: var(--yellow); width: 70%; box-shadow: 0 0 8px rgba(245, 197, 24, 0.5); }
-.cday { position: absolute; bottom: -14px; font-size: 0.58rem; color: var(--mut); }
+.cday { position: absolute; bottom: -15px; font-size: 0.6rem; color: var(--mut); white-space: nowrap; }
+.cbar.z { opacity: 0.18; }
+.chart { height: 100px; padding-bottom: 20px; }
+
+/* story links + add-task + Mila */
+.storylink {
+  display: block; width: 100%; text-align: left; background: rgba(245, 197, 24, 0.07);
+  border: 1px dashed rgba(245, 197, 24, 0.4); color: var(--yellow); font-weight: 650; font-size: 0.82rem;
+  padding: 9px 12px; border-radius: 9px; margin-bottom: 9px; cursor: pointer;
+}
+.addtask { display: flex; gap: 7px; margin-top: 10px; }
+.addtask input { flex: 1; margin-bottom: 0; }
+.addtask .btn { padding: 11px 12px; font-size: 0.8rem; white-space: nowrap; }
+.hrow.duerow { border-color: var(--yellow); }
+.hrow.duerow .box { border-color: var(--yellow); }
+.hrow.on .sub, .hrow.duerow .sub { flex: 0 0 auto; }
 
 /* journal */
 .prompts { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }

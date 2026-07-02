@@ -1,8 +1,22 @@
 import { notion, DB, titleText, text, sel, queryAll } from "../../lib/notion";
 
-// GET /api/today -> { tasks: [...], quote: {...} }
+// GET  /api/today                  -> { tasks: [...], quote: {...} }
+// POST /api/today {title, status}  -> creates a task (🔥 Today or 🧠 Brain Dump)
 export default async function handler(req, res) {
   try {
+    if (req.method === "POST") {
+      const { title, status } = req.body || {};
+      if (!title?.trim()) return res.status(400).json({ error: "missing title" });
+      const st = status === "🧠 Brain Dump" ? "🧠 Brain Dump" : "🔥 Today";
+      const page = await notion.pages.create({
+        parent: { database_id: DB.todo },
+        properties: {
+          Task: { title: [{ text: { content: title.trim().slice(0, 200) } }] },
+          Status: { select: { name: st } },
+        },
+      });
+      return res.status(200).json({ ok: true, id: page.id });
+    }
     const taskPages = await queryAll(DB.todo, {
       filter: { property: "Status", select: { equals: "🔥 Today" } },
     });

@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import Head from "next/head";
 
+const VERSION = "v5.4";
+const MDM_PAGE = "160fcb70586380d7afcbefb75870943e"; // 🌅 Million Dollar Morning (Brad Lea)
+const WUW_PAGE = "160fcb705863804c9815cf77fccca91f"; // ⚔️ Wake Up Warrior
+const MILA_GUIDE = "391fcb70586381609bf8ecaf23378d9d"; // 🐶 Mila — Best Life Guide
 const TITLES = ["Getting Started", "Spark", "Builder", "Momentum", "Warrior", "Relentless", "Unstoppable", "Legend"];
 const TABS = [
   ["today", "⚡ Today"],
@@ -103,8 +107,8 @@ export default function Home() {
       </header>
 
       <main>
-        {tab === "today" && <Today xp={xp} say={say} />}
-        {tab === "h75" && <><H75 xp={xp} say={say} openPage={setReader} /><WorkoutTimer xp={xp} say={say} /></>}
+        {tab === "today" && <Today xp={xp} say={say} openPage={setReader} />}
+        {tab === "h75" && <><WorkoutTimer xp={xp} say={say} /><QuoteRotator match="Frisella" label="🗣️ Frisella fuel" /><H75 xp={xp} say={say} openPage={setReader} /></>}
         {tab === "focus" && <Focus xp={xp} say={say} S={S} save={save} />}
         {tab === "learn" && <Learn openPage={setReader} />}
         {tab === "reflect" && <Reflect xp={xp} say={say} />}
@@ -112,7 +116,7 @@ export default function Home() {
       </main>
 
       <footer className="foot">
-        Personal Level Up · synced with your Notion ·{" "}
+        Personal Level Up {VERSION} · synced with your Notion ·{" "}
         <a href="https://app.notion.com/p/390fcb70586381878204cfabca02ad93" target="_blank" rel="noopener noreferrer">Open hub ↗</a>
       </footer>
       {toast && <div className="toast show">{toast}</div>}
@@ -195,8 +199,41 @@ function Reader({ id, fallbackTitle, close, say }) {
   );
 }
 
+// ================= QUOTE ROTATOR =================
+function QuoteRotator({ match, label }) {
+  const [list, setList] = useState([]);
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    const c = lsGet("q:" + match);
+    if (c?.length) { setList(c); setI(Math.floor(Math.random() * c.length)); }
+    (async () => {
+      try {
+        const j = await (await fetch("/api/quotes?m=" + encodeURIComponent(match))).json();
+        if (alive && j.quotes?.length) {
+          setList(j.quotes); lsSet("q:" + match, j.quotes);
+          if (!c?.length) setI(Math.floor(Math.random() * j.quotes.length));
+        }
+      } catch {}
+    })();
+    return () => { alive = false; };
+  }, [match]);
+  useEffect(() => {
+    if (list.length < 2) return;
+    const iv = setInterval(() => setI((x) => (x + 1) % list.length), 25000);
+    return () => clearInterval(iv);
+  }, [list]);
+  if (!list.length) return null;
+  const q = list[i % list.length];
+  return (
+    <blockquote className="quote" onClick={() => setI((x) => (x + 1) % list.length)} style={{ cursor: "pointer" }} title="Tap for another">
+      &ldquo;{q.quote}&rdquo;<cite>&mdash; {q.author || "Unknown"} · {label}</cite>
+    </blockquote>
+  );
+}
+
 // ================= TODAY =================
-function Today({ xp, say }) {
+function Today({ xp, say, openPage }) {
   const [data, setData] = useState(null);
   const [err, setErr] = useState(null);
   const [routines, setRoutines] = useState(null);
@@ -287,12 +324,23 @@ function Today({ xp, say }) {
               <button className="do" onClick={() => done(t.id)}>Done</button>
             </div>
           ))}
+          <AddTask say={say} onAdded={(t) => setData((d) => ({ ...d, tasks: [...d.tasks, t] }))} />
         </section>
       )}
       {groups.map(([label, list]) =>
         list.length ? (
           <section key={label}>
             <h2>{label} <span className="sub">{list.filter((r) => r.done).length}/{list.length}</span></h2>
+            {label.includes("Million") && (
+              <button className="storylink" onClick={() => openPage({ id: MDM_PAGE, title: "🌅 Million Dollar Morning — Brad Lea" })}>
+                📖 The full Million Dollar Morning story — tap to read
+              </button>
+            )}
+            {label.includes("Core 4") && (
+              <button className="storylink" onClick={() => openPage({ id: WUW_PAGE, title: "⚔️ Wake Up Warrior — what Core 4 means" })}>
+                📖 What is Core 4? The Wake Up Warrior story — tap to read
+              </button>
+            )}
             {list.map((r) => (
               <button key={r.id} className={"hrow" + (r.done ? " on" : "")} onClick={() => toggleRoutine(r)}>
                 <span className="box">✓</span>
@@ -303,7 +351,97 @@ function Today({ xp, say }) {
           </section>
         ) : null
       )}
+      <Mila xp={xp} say={say} openPage={openPage} />
     </>
+  );
+}
+
+function AddTask({ say, onAdded }) {
+  const [t, setT] = useState("");
+  const [busy, setBusy] = useState(false);
+  async function add(status) {
+    if (!t.trim() || busy) return;
+    setBusy(true);
+    try {
+      const j = await (await fetch("/api/today", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: t.trim(), status }),
+      })).json();
+      if (j.error) throw new Error(j.error);
+      say(status === "🧠 Brain Dump" ? "Dumped 🧠 — it's in Notion" : "Added to Today 🔥");
+      if (status !== "🧠 Brain Dump") onAdded({ id: j.id, title: t.trim(), step: "", priority: "", energy: "" });
+      setT("");
+    } catch { say("Couldn't add — try again"); }
+    setBusy(false);
+  }
+  return (
+    <div className="addtask">
+      <input value={t} onChange={(e) => setT(e.target.value)} placeholder="Add a task… (syncs to Notion)"
+        onKeyDown={(e) => e.key === "Enter" && add("🔥 Today")} />
+      <button className="btn" disabled={busy} onClick={() => add("🔥 Today")}>🔥 Today</button>
+      <button className="btn sec" disabled={busy} onClick={() => add("🧠 Brain Dump")}>🧠 Dump</button>
+    </div>
+  );
+}
+
+// ================= MILA 🐶 =================
+function Mila({ xp, say, openPage }) {
+  const [items, setItems] = useState(null);
+  const load = useCallback(async () => {
+    const c = lsGet("mila");
+    if (c) setItems(c);
+    try {
+      const j = await (await fetch("/api/mila")).json();
+      if (!j.error) { setItems(j.items); lsSet("mila", j.items); }
+    } catch {}
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  function daysSince(last) {
+    if (!last) return Infinity;
+    return Math.floor((new Date(todayStr()) - new Date(last)) / 86400000);
+  }
+  function isDue(it) {
+    const d = daysSince(it.last);
+    if (it.freq.includes("Daily")) return d >= 1;
+    if (it.freq.includes("Weekly")) return d >= 7;
+    return d >= 30;
+  }
+  async function doneIt(it) {
+    setItems((xs) => xs.map((x) => (x.id === it.id ? { ...x, last: todayStr() } : x)));
+    xp(3, false); say("Mila loved that 🐶 +3 XP");
+    await fetch("/api/mila", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: it.id, date: todayStr() }) });
+  }
+  if (!items) return null;
+  const order = ["☀️ Daily", "📅 Weekly", "🌙 Monthly"];
+  const due = items.filter(isDue).length;
+  return (
+    <section>
+      <h2>🐶 Mila <span className="sub">{due ? due + " due" : "all caught up 🎉"}</span></h2>
+      <button className="storylink" onClick={() => openPage({ id: MILA_GUIDE, title: "🐶 Mila — Best Life Guide" })}>
+        📖 Her Best Life guide — breed care, food rules, back safety
+      </button>
+      {order.map((f) => {
+        const group = items.filter((i) => i.freq === f);
+        if (!group.length) return null;
+        return (
+          <div key={f}>
+            <div className="chartlbl">{f}</div>
+            {group.map((it) => {
+              const d = daysSince(it.last);
+              const due = isDue(it);
+              return (
+                <button key={it.id} className={"hrow" + (due ? " duerow" : " on")} onClick={() => doneIt(it)} title={it.notes || ""}>
+                  <span className="box">✓</span>
+                  <span className="hn">{it.care}</span>
+                  <span className="sub">{it.last ? (d === 0 ? "today" : d + "d ago") : "never"}</span>
+                </button>
+              );
+            })}
+          </div>
+        );
+      })}
+    </section>
   );
 }
 function NotifyCard({ say }) {
@@ -551,6 +689,7 @@ function Focus({ xp, say, S, save }) {
 
   return (
     <>
+      <QuoteRotator match="Grover,Kobe,Jordan,Ali,Bryant,Frisella" label="🏆 Focus fuel" />
       <section>
         <h2>🍅 Pomodoro <span className="sub">{pomoCount} today</span></h2>
         <div className="modes">
@@ -925,11 +1064,11 @@ function Stats() {
         <>
           <div className="chartlbl">⚡ Energy (1–10) &amp; 😴 sleep hrs</div>
           <div className="chart">
-            {data.energy.map((d, i) => (
+            {data.energy.map((d, i, arr) => (
               <div className="cbarwrap" key={i} title={d.day + " · sleep " + d.sleep + "h · energy " + d.energy}>
-                <div className="cbar sleepb" style={{ height: Math.min(100, (d.sleep / 10) * 100) + "%" }} />
-                <div className="cbar energyb" style={{ height: (d.energy / 10) * 100 + "%" }} />
-                <span className="cday">{(d.date || "").slice(8)}</span>
+                <div className={"cbar sleepb" + (d.sleep ? "" : " z")} style={{ height: Math.max(4, Math.min(100, (d.sleep / 10) * 100)) + "%" }} />
+                <div className={"cbar energyb" + (d.energy ? "" : " z")} style={{ height: Math.max(4, (d.energy / 10) * 100) + "%" }} />
+                {i % Math.ceil(arr.length / 7) === 0 && <span className="cday">{(d.date || "").slice(5).replace("-", "/")}</span>}
               </div>
             ))}
           </div>
@@ -939,10 +1078,10 @@ function Stats() {
         <>
           <div className="chartlbl">🔥 75 Hard — items done per day (7 = perfect)</div>
           <div className="chart">
-            {data.h75.map((d, i) => (
+            {data.h75.map((d, i, arr) => (
               <div className="cbarwrap" key={i} title={d.day + " · " + d.done + "/7"}>
-                <div className={"cbar " + (d.done === 7 ? "perfb" : "h75b")} style={{ height: (d.done / 7) * 100 + "%" }} />
-                <span className="cday">{(d.date || "").slice(8)}</span>
+                <div className={"cbar " + (d.done === 7 ? "perfb" : "h75b") + (d.done ? "" : " z")} style={{ height: Math.max(4, (d.done / 7) * 100) + "%" }} />
+                {i % Math.ceil(arr.length / 7) === 0 && <span className="cday">{(d.date || "").slice(5).replace("-", "/")}</span>}
               </div>
             ))}
           </div>
@@ -953,10 +1092,10 @@ function Stats() {
         <>
           <div className="chartlbl">⚖️ Weight ({wMin}–{wMax} lbs)</div>
           <div className="chart">
-            {weights.map((d, i) => (
+            {weights.map((d, i, arr) => (
               <div className="cbarwrap" key={i} title={d.day + " · " + d.weight + " lbs"}>
                 <div className="cbar h75b" style={{ height: (wMax === wMin ? 60 : 15 + ((d.weight - wMin) / (wMax - wMin)) * 85) + "%" }} />
-                <span className="cday">{(d.date || "").slice(8)}</span>
+                {i % Math.ceil(arr.length / 7) === 0 && <span className="cday">{(d.date || "").slice(5).replace("-", "/")}</span>}
               </div>
             ))}
           </div>
