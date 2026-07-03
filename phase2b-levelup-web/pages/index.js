@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import Head from "next/head";
 
-const VERSION = "v6.5";
+const VERSION = "v6.6";
 // tiny haptics — no-op where unsupported (iOS Safari)
 function buzz(pattern) { try { navigator.vibrate && navigator.vibrate(pattern); } catch {} }
 const MDM_PAGE = "160fcb70586380d7afcbefb75870943e"; // 🌅 Million Dollar Morning (Brad Lea)
@@ -216,6 +216,57 @@ function Reader({ id, fallbackTitle, close, say }) {
   );
 }
 
+// ================= BREATHE (box breathing w/ haptics) =================
+const BREATH_PHASES = [
+  ["Breathe in", 1.28, [50]],
+  ["Hold", 1.28, [15, 40, 15]],
+  ["Breathe out", 0.82, [50]],
+  ["Hold", 0.82, [15, 40, 15]],
+];
+function Breathe({ compact }) {
+  const [on, setOn] = useState(false);
+  const [pi, setPi] = useState(0);
+  const [sec, setSec] = useState(4);
+  const [cycles, setCycles] = useState(0);
+  useEffect(() => {
+    if (!on) return;
+    const iv = setInterval(() => {
+      setSec((s) => {
+        if (s > 1) return s - 1;
+        setPi((p) => {
+          const np = (p + 1) % 4;
+          buzz(BREATH_PHASES[np][2]);
+          if (np === 0) setCycles((c) => c + 1);
+          return np;
+        });
+        return 4;
+      });
+    }, 1000);
+    return () => clearInterval(iv);
+  }, [on]);
+  function toggle() {
+    if (!on) { setPi(0); setSec(4); setCycles(0); buzz(BREATH_PHASES[0][2]); }
+    setOn(!on);
+  }
+  const [label, scale] = BREATH_PHASES[pi];
+  return (
+    <section style={compact ? { padding: "18px 20px" } : undefined}>
+      <h2>🧘 Breathe <span className="sub">{on ? cycles + " cycle" + (cycles === 1 ? "" : "s") + " · aim for 5" : "box breathing · 4-4-4-4"}</span></h2>
+      <div className="bwrap">
+        <div className="bbox" style={{ transform: `scale(${on ? scale : 1})` }}>
+          <div>
+            <div className="bphase">{on ? label : "Ready"}</div>
+            {on && <div className="bcount">{sec}</div>}
+          </div>
+        </div>
+      </div>
+      <div className="tbtns">
+        <button className="btn" onClick={toggle}>{on ? "Stop" : "Start"}</button>
+      </div>
+    </section>
+  );
+}
+
 // ================= QUOTE ROTATOR =================
 function QuoteRotator({ match, label }) {
   const [list, setList] = useState([]);
@@ -369,6 +420,7 @@ function Today({ xp, say, openPage }) {
         ) : null
       )}
       <Mila xp={xp} say={say} openPage={openPage} />
+      <Breathe compact />
       <Coach />
     </>
   );
@@ -402,7 +454,7 @@ function Coach() {
       {!msgs.length && <p className="empty">Straight talk on demand. Try: &ldquo;I don&rsquo;t feel like working out today.&rdquo;</p>}
       <div className="chat">
         {msgs.slice(-6).map((m, i) => (
-          <div key={i} className={"bubble " + (m.role === "user" ? "me" : "them")}>{m.content}</div>
+          <div key={i} className={"bubble " + (m.role === "user" ? "me" : "them")}>{String(m.content).replace(/\*\*/g, "").replace(/^#+\s*/gm, "")}</div>
         ))}
         {busy && <div className="bubble them">…</div>}
       </div>
@@ -668,6 +720,18 @@ function H75({ xp, say, openPage }) {
           <p className="empty">{done === 7 ? "Perfect day. Unbreakable. 🔥" : "Check off all 7. Miss one → back to Day 1."}</p>
         </section>
       )}
+      {totals && (
+        <section>
+          <h2>⏳ Countdown <span className="sub">finish line {totals.finish ? new Date(totals.finish + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "—"}</span></h2>
+          <div className="bignum" style={{ fontSize: "3.6rem", justifyContent: "center" }}>
+            {Math.max(0, totals.total - (totals.attemptDay ?? 0))}
+            <span className="bignum-l">days until unbreakable</span>
+          </div>
+          <div className="xpbar" style={{ marginTop: 8 }}><i style={{ width: Math.min(100, ((totals.attemptDay ?? 0) / totals.total) * 100) + "%" }} /></div>
+          <p className="empty" style={{ textAlign: "center", marginTop: 6 }}>{Math.round(((totals.attemptDay ?? 0) / totals.total) * 100)}% through attempt #{(totals.resets ?? 0) + 1}</p>
+        </section>
+      )}
+      <Breathe compact />
       {totals && (
         <section>
           <h2>🏆 Challenge progress <span className="sub">day {totals.attemptDay ?? totals.elapsed} of {totals.total}{totals.resets ? " · " + totals.resets + " restart" + (totals.resets > 1 ? "s" : "") : ""}</span></h2>
@@ -1302,6 +1366,7 @@ function Journal({ xp, say }) {
 
   return (
     <>
+      <QuoteRotator match="Aurelius,Seneca,Epictetus,Gandhi,Buddha,Thich,Rumi" label="🧘 Stillness" />
       <section>
         <h2>📝 Journal <span className="sub">write it into existence</span></h2>
         <div className="modes">

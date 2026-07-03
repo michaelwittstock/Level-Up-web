@@ -294,6 +294,17 @@ hr { border: none; border-top: 1px solid var(--panel3); margin: 14px 0; }
 .micbtn.live { background: var(--red); color: #fff; animation: pulse 1.2s infinite; }
 @keyframes pulse { 50% { opacity: 0.6; } }
 
+/* ---------- breathe ---------- */
+.bwrap { display: flex; justify-content: center; padding: 14px 0 18px; }
+.bbox {
+  width: 150px; height: 150px; border-radius: 26px; text-align: center;
+  background: radial-gradient(circle at 50% 38%, rgba(30, 99, 214, 0.5), rgba(30, 99, 214, 0.1));
+  display: flex; align-items: center; justify-content: center;
+  transition: transform 4s linear; box-shadow: 0 0 60px rgba(30, 99, 214, 0.25);
+}
+.bphase { font-size: 1.15rem; font-weight: 900; }
+.bcount { color: var(--mut); font-size: 0.85rem; margin-top: 2px; font-weight: 700; }
+
 /* ---------- coach chat ---------- */
 .chat { display: flex; flex-direction: column; gap: 8px; margin-bottom: 4px; }
 .bubble { max-width: 85%; padding: 11px 15px; border-radius: 18px; font-size: 0.92rem; line-height: 1.5; white-space: pre-wrap; }

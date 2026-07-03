@@ -32,12 +32,24 @@ export default async function handler(req, res) {
         if (sorted[i].p) streak++; else break;
       }
       const perfect = sorted.filter((r) => r.p).length;
+      // attempt-aware day: a missed past day restarts the challenge
+      const past = sorted.filter((r) => r.d < today);
+      let resets = 0, attemptStart = sorted.length ? sorted[0].d : today;
+      for (const r of past) {
+        if (!r.p) {
+          resets++;
+          const nxt = new Date(r.d + "T12:00:00Z");
+          nxt.setUTCDate(nxt.getUTCDate() + 1);
+          attemptStart = nxt.toISOString().slice(0, 10);
+        }
+      }
+      const attemptDay = Math.max(1, Math.min(75, Math.floor((new Date(today) - new Date(attemptStart)) / 86400000) + 1));
       const avgE = energy.length ? (energy.reduce((s, p) => s + num(p, "Energy (1-10)"), 0) / energy.length).toFixed(1) : "no data";
       const avgS = energy.length ? (energy.reduce((s, p) => s + num(p, "Sleep (hrs)"), 0) / energy.length).toFixed(1) : "no data";
-      ctx = `Michael's live data: 75 Hard — day ${sorted.length} of 75, ${perfect} perfect days, current streak ${streak}. Last-7-days avg energy ${avgE}/10, avg sleep ${avgS}h. Goals: ${goals.slice(0, 6).map((g) => `${titleText(g)} (${num(g, "Progress %")}%)`).join("; ") || "none set"}.`;
+      ctx = `Michael's live data: 75 Hard — day ${attemptDay} of 75 on attempt #${resets + 1}${resets ? ` (he failed and restarted ${resets}x — respect the restart, it means he didn't quit)` : ""}, ${perfect} total perfect days, current streak ${streak}. Last-7-days avg energy ${avgE}/10, avg sleep ${avgS}h. Goals: ${goals.slice(0, 6).map((g) => `${titleText(g)} (${num(g, "Progress %")}%)`).join("; ") || "none set"}.`;
     } catch {}
 
-    const system = `You are Michael's personal coach inside his "Level Up" app — think David Goggins' intensity with Jocko Willink's discipline, but you're on HIS side. Rules: be direct, punchy, no fluff, max ~120 words. Use his real numbers when relevant. Call out excuses, then give ONE concrete next action. Never shame — push. Occasionally reference: extreme ownership, discipline equals freedom, staying hard, the 40% rule. He's doing 75 Hard, building a business (Wittstock Digital), and has a mini dachshund Mila. ${ctx}`;
+    const system = `You are Michael's personal coach inside his "Level Up" app — think David Goggins' intensity with Jocko Willink's discipline, but you're on HIS side. Rules: be direct, punchy, no fluff, max ~120 words. PLAIN TEXT ONLY — no markdown, no asterisks, no headers, no bullet symbols; short paragraphs and line breaks only. Use his real numbers when relevant. Call out excuses, then give ONE concrete next action. Never shame — push. Occasionally reference: extreme ownership, discipline equals freedom, staying hard, the 40% rule. He's doing 75 Hard, building a business (Wittstock Digital), and has a mini dachshund Mila. ${ctx}`;
 
     const r = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",

@@ -55,7 +55,28 @@ export default async function handler(req, res) {
       }
     }
     const attemptDay = Math.max(1, Math.min(75, Math.floor((new Date(date) - new Date(attemptStart)) / 86400000) + 1));
-    const totals = { elapsed, perfect, total: 75, current, longest, attemptDay, resets };
+    const finish = new Date(new Date(attemptStart + "T12:00:00Z").getTime() + 74 * 86400000).toISOString().slice(0, 10);
+    const totals = { elapsed, perfect, total: 75, current, longest, attemptDay, resets, attemptStart, finish };
+
+    // ---- auto-archive: tag every row with its attempt number so Notion can
+    // ---- group failed runs ("Attempt 1", "Attempt 2", …) like folders.
+    try {
+      // attempt number for a date = 1 + failures strictly before that date
+      const failDates = past.filter((r) => !r.perfect).map((r) => r.d);
+      const attemptOf = (d) => 1 + failDates.filter((f) => f < d).length;
+      let updates = 0;
+      for (const raw of allRows) {
+        if (updates >= 15) break; // stay under serverless time limits; next load continues
+        const d = raw.properties?.Date?.date?.start;
+        if (!d) continue;
+        const want = "Attempt " + attemptOf(d);
+        const have = raw.properties?.Attempt?.select?.name || "";
+        if (have !== want) {
+          await notion.pages.update({ page_id: raw.id, properties: { Attempt: { select: { name: want } } } });
+          updates++;
+        }
+      }
+    } catch {}
     if (!rows.length) return res.status(200).json({ row: null, totals });
     const p = rows[0];
     res.status(200).json({
