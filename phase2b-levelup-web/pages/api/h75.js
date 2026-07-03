@@ -41,13 +41,20 @@ export default async function handler(req, res) {
       if (sorted[i].perfect) current++;
       else break;
     }
-    // attempt-aware: any PAST day with <7 checks fails the attempt; it restarts the next day.
-    // (Notion rows keep their original Day labels — this only changes what we display.)
-    let attemptStartIdx = 0, resets = 0;
-    for (let i = 0; i < sorted.length; i++) {
-      if (sorted[i].d < date && !sorted[i].perfect) { attemptStartIdx = i + 1; resets++; }
+    // attempt-aware: any PAST day (before today) with <7 checks = failed attempt →
+    // the challenge restarts the next day. attemptDay = today's day number in the
+    // current attempt; resets = how many times it restarted.
+    const past = sorted.filter((r) => r.d < date);
+    let resets = 0, attemptStart = sorted.length ? sorted[0].d : date;
+    for (const r of past) {
+      if (!r.perfect) {
+        resets++;
+        const nxt = new Date(r.d + "T12:00:00Z");
+        nxt.setUTCDate(nxt.getUTCDate() + 1);
+        attemptStart = nxt.toISOString().slice(0, 10);
+      }
     }
-    const attemptDay = sorted.length - attemptStartIdx;
+    const attemptDay = Math.max(1, Math.min(75, Math.floor((new Date(date) - new Date(attemptStart)) / 86400000) + 1));
     const totals = { elapsed, perfect, total: 75, current, longest, attemptDay, resets };
     if (!rows.length) return res.status(200).json({ row: null, totals });
     const p = rows[0];

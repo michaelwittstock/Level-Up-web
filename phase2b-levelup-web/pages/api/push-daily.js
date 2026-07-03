@@ -56,6 +56,31 @@ export default async function handler(req, res) {
       if (dueM.length) lines.push(`🐶 Mila: ${dueM.length} due (${dueM.slice(0, 2).map(titleText).join(", ")}${dueM.length > 2 ? "…" : ""})`);
     } catch {}
 
+    // 3.5) 1st of the month: net worth snapshot + cash flow nudge
+    try {
+      if (new Date(today + "T12:00:00Z").getUTCDate() === 1) {
+        const NW_HISTORY = "501d1cc52bdd469383a92ecf0fd571bb";
+        const items = await queryAll("081ec9b7fbaf434f8d32c6509d4e3ee1");
+        let assets = 0, liabilities = 0;
+        for (const p of items) {
+          const v = p.properties?.Value?.number || 0;
+          if ((sel(p, "Type") || "").includes("Asset")) assets += v; else liabilities += v;
+        }
+        const label = new Date(today + "T12:00:00Z").toLocaleDateString("en-US", { month: "long", year: "numeric" });
+        await notion.pages.create({
+          parent: { database_id: NW_HISTORY },
+          properties: {
+            Month: { title: [{ text: { content: label } }] },
+            Date: { date: { start: today } },
+            Assets: { number: assets },
+            Liabilities: { number: liabilities },
+            Net: { number: assets - liabilities },
+          },
+        });
+        lines.push(`🧾 New month: net worth snapshot saved ($${Math.round(assets - liabilities).toLocaleString()}). Log last month's cash flow.`);
+      }
+    } catch {}
+
     // 4) Sunday: week recap teaser
     try {
       if (new Date().getUTCDay() === 0) {
@@ -65,30 +90,6 @@ export default async function handler(req, res) {
         });
         const perf = week.filter((r) => H75.every(([prop]) => check(r, prop))).length;
         lines.push(`📊 This week: ${perf}/7 perfect days — full recap lands in Notion at 6pm.`);
-      }
-    } catch {}
-
-    // 5) 1st of the month: snapshot net worth into 📈 Net Worth History
-    try {
-      if (new Date().getUTCDate() === 1) {
-        const NW_DB = "081ec9b7fbaf434f8d32c6509d4e3ee1";
-        const HIST_DB = "501d1cc52bdd469383a92ecf0fd571bb";
-        const rows = await queryAll(NW_DB);
-        const val = (p) => p.properties?.Value?.number || 0;
-        const assets = rows.filter((p) => (sel(p, "Type") || "").includes("Asset")).reduce((s, p) => s + val(p), 0);
-        const liab = rows.filter((p) => (sel(p, "Type") || "").includes("Liability")).reduce((s, p) => s + val(p), 0);
-        const label = new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" });
-        await notion.pages.create({
-          parent: { database_id: HIST_DB },
-          properties: {
-            Month: { title: [{ text: { content: label } }] },
-            Date: { date: { start: today } },
-            Assets: { number: assets },
-            Liabilities: { number: liab },
-            Net: { number: assets - liab },
-          },
-        });
-        lines.push(`🧾 New month — net worth snapshot saved: $${Math.round(assets - liab).toLocaleString()} net.`);
       }
     } catch {}
 

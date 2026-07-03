@@ -70,14 +70,14 @@ button:active, .hrow:active, .h75item:active, .rtodo:active { transform: scale(0
 /* ---------- cards ---------- */
 section {
   background: var(--panel); border: none; border-radius: var(--radius);
-  padding: 20px; margin-bottom: 16px;
+  padding: 24px 22px; margin-bottom: 22px;
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 10px 30px rgba(0, 0, 0, 0.35);
 }
 h2 {
-  font-size: 1.02rem; margin: 0 0 14px; font-weight: 800; letter-spacing: -0.01em;
-  display: flex; justify-content: space-between; align-items: baseline; text-transform: none;
+  font-size: 1.22rem; margin: 0 0 18px; font-weight: 800; letter-spacing: -0.02em;
+  display: flex; justify-content: space-between; align-items: baseline; text-transform: none; gap: 10px;
 }
-.sub { color: var(--mut); font-size: 0.76rem; font-weight: 600; }
+.sub { color: var(--mut); font-size: 0.78rem; font-weight: 600; }
 
 /* ---------- quote ---------- */
 .quote {
@@ -294,6 +294,12 @@ hr { border: none; border-top: 1px solid var(--panel3); margin: 14px 0; }
 .micbtn.live { background: var(--red); color: #fff; animation: pulse 1.2s infinite; }
 @keyframes pulse { 50% { opacity: 0.6; } }
 
+/* ---------- coach chat ---------- */
+.chat { display: flex; flex-direction: column; gap: 8px; margin-bottom: 4px; }
+.bubble { max-width: 85%; padding: 11px 15px; border-radius: 18px; font-size: 0.92rem; line-height: 1.5; white-space: pre-wrap; }
+.bubble.me { align-self: flex-end; background: var(--blue); color: #fff; border-bottom-right-radius: 6px; }
+.bubble.them { align-self: flex-start; background: var(--panel2); border-bottom-left-radius: 6px; }
+
 /* ---------- extras ---------- */
 .storylink {
   display: block; width: 100%; text-align: left; background: rgba(245, 197, 24, 0.07);
@@ -323,13 +329,3 @@ hr { border: none; border-top: 1px solid var(--panel3); margin: 14px 0; }
   .app { padding-bottom: 120px; }
   .timer { font-size: 3.6rem; }
 }
-
-/* ---------- v6.4: coach chat ---------- */
-.chat { display: flex; flex-direction: column; gap: 8px; max-height: 340px; overflow-y: auto; margin-bottom: 10px; }
-.bubble { max-width: 85%; padding: 10px 14px; border-radius: 18px; font-size: 0.92rem; line-height: 1.45; white-space: pre-wrap; }
-.bubble.me { align-self: flex-end; background: var(--blue); color: #fff; border-bottom-right-radius: 6px; }
-.bubble.them { align-self: flex-start; background: var(--panel2); border-bottom-left-radius: 6px; }
-
-/* ---------- v6.4: pull to refresh ---------- */
-.ptr { height: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; color: var(--mut); font-size: 0.8rem; font-weight: 600; }
-.ptr.go { height: 34px; transition: height 0.2s ease; }
