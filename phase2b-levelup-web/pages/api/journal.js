@@ -7,8 +7,15 @@ const AREAS = ["Health", "Work/Business", "Money", "Relationships", "Growth", "F
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
   try {
-    const { type, title, area, why, body } = req.body || {};
-    if (!title || !["goal", "dream"].includes(type)) return res.status(400).json({ error: "bad request" });
+    const { type, area, why, body } = req.body || {};
+    let { title } = req.body || {};
+    if (!["goal", "dream"].includes(type)) return res.status(400).json({ error: "bad request" });
+    // auto-title from the writing when no name was given
+    if (!title?.trim() && body?.trim()) {
+      title = body.trim().split(/\n/)[0].split(/\s+/).slice(0, 9).join(" ");
+      if (title.length > 70) title = title.slice(0, 67) + "…";
+    }
+    if (!title?.trim()) return res.status(400).json({ error: "missing title" });
 
     const properties = {
       Goal: { title: [{ text: { content: String(title).slice(0, 180) } }] },

@@ -5,7 +5,14 @@ import { notion, DB, titleText, sel, num, queryAll } from "../../lib/notion";
 export default async function handler(req, res) {
   try {
     if (req.method === "POST") {
-      const { grateful, win, mood, date } = req.body || {};
+      const { grateful, win, mood, date, goalId, pct } = req.body || {};
+      // goal progress update
+      if (goalId !== undefined) {
+        const n = Math.max(0, Math.min(100, Number(pct)));
+        if (!goalId || isNaN(n)) return res.status(400).json({ error: "bad goal update" });
+        await notion.pages.update({ page_id: goalId, properties: { "Progress %": { number: n } } });
+        return res.status(200).json({ ok: true });
+      }
       if (!grateful && !win) return res.status(400).json({ error: "empty" });
       const properties = {
         "Grateful For": {
@@ -23,6 +30,7 @@ export default async function handler(req, res) {
       filter: { property: "Status", select: { does_not_equal: "🏆 Achieved" } },
     });
     const goals = pages.map((p) => ({
+      id: p.id,
       goal: titleText(p),
       status: sel(p, "Status"),
       pct: num(p, "Progress %"),

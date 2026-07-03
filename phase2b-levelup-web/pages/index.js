@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import Head from "next/head";
 
-const VERSION = "v5.4";
+const VERSION = "v5.5";
 const MDM_PAGE = "160fcb70586380d7afcbefb75870943e"; // 🌅 Million Dollar Morning (Brad Lea)
 const WUW_PAGE = "160fcb705863804c9815cf77fccca91f"; // ⚔️ Wake Up Warrior
 const MILA_GUIDE = "391fcb70586381609bf8ecaf23378d9d"; // 🐶 Mila — Best Life Guide
@@ -602,13 +602,17 @@ function H75({ xp, say, openPage }) {
       {totals && (
         <section>
           <h2>🏆 Challenge progress <span className="sub">day {totals.elapsed} of {totals.total}</span></h2>
+          {[75, 50, 25].filter((m) => totals.current >= m).slice(0, 1).map((m) => (
+            <p key={m} className="milestone">🎉 Day {m} milestone — {m === 75 ? "YOU FINISHED. Unbreakable." : m === 50 ? "two-thirds territory. Relentless." : "quarter mark. Momentum is real."}</p>
+          ))}
           <div className="networth">
-            <div><span className="sub">Perfect days</span><b className="pos">{totals.perfect}</b></div>
-            <div><span className="sub">Days in</span><b>{totals.elapsed}</b></div>
+            <div><span className="sub">Streak</span><b style={{ color: "var(--yellow)" }}>🔥 {totals.current || 0}</b></div>
+            <div><span className="sub">Longest</span><b>{totals.longest || 0}</b></div>
+            <div><span className="sub">Perfect</span><b className="pos">{totals.perfect}</b></div>
             <div><span className="sub">To go</span><b className="neg">{Math.max(0, totals.total - totals.elapsed)}</b></div>
           </div>
           <div className="xpbar" style={{ marginTop: 10 }}><i style={{ width: Math.min(100, (totals.perfect / totals.total) * 100) + "%" }} /></div>
-          <p className="empty" style={{ marginTop: 6 }}>{totals.perfect} of {totals.total} perfect days banked.</p>
+          <p className="empty" style={{ marginTop: 6 }}>{totals.perfect} of {totals.total} perfect days banked · <a href="/share" target="_blank" rel="noopener noreferrer" style={{ color: "var(--mut)" }}>public scoreboard ↗</a></p>
         </section>
       )}
       <section>
@@ -689,7 +693,7 @@ function Focus({ xp, say, S, save }) {
 
   return (
     <>
-      <QuoteRotator match="Grover,Kobe,Jordan,Ali,Bryant,Frisella" label="🏆 Focus fuel" />
+      <QuoteRotator match="Grover,Kobe,Jordan,Ali,Lombardi,Goggins" label="🏆 Focus fuel" />
       <section>
         <h2>🍅 Pomodoro <span className="sub">{pomoCount} today</span></h2>
         <div className="modes">
@@ -849,6 +853,8 @@ function Learn({ openPage }) {
 function Reflect({ xp, say }) {
   const [goals, setGoals] = useState(null);
   const [err, setErr] = useState(null);
+  const [editGoal, setEditGoal] = useState(null);
+  const [gpct, setGpct] = useState(0);
   const [g1, setG1] = useState("");
   const [win, setWin] = useState("");
   const [mood, setMood] = useState("🙂 Good");
@@ -898,10 +904,29 @@ function Reflect({ xp, say }) {
       <section>
         <h2>🎯 Goals <span className="sub">{goals ? goals.length + " active" : "…"}</span></h2>
         {err && <Err retry={load} msg={err} />}
-        {goals?.slice(0, 8).map((g, i) => (
-          <div className="goal" key={i}>
-            <div className="grow"><span>{g.goal}</span><span className="sub">{g.pct}%</span></div>
-            <div className="xpbar"><i style={{ width: g.pct + "%" }} /></div>
+        {goals?.slice(0, 8).map((g) => (
+          <div className="goal" key={g.id}>
+            <div className="grow">
+              <span>{g.goal}</span>
+              {editGoal === g.id ? null : (
+                <button className="mval" style={{ padding: "2px 8px", fontSize: "0.78rem" }}
+                  onClick={() => { setEditGoal(g.id); setGpct(g.pct); }}>{g.pct}%</button>
+              )}
+            </div>
+            {editGoal === g.id ? (
+              <div className="erow" style={{ marginTop: 4 }}>
+                <input className="eslide" type="range" min="0" max="100" step="5" value={gpct} onChange={(e) => setGpct(Number(e.target.value))} />
+                <b style={{ minWidth: 42 }}>{gpct}%</b>
+                <button className="btn sec" onClick={async () => {
+                  setEditGoal(null);
+                  setGoals((gs) => gs.map((x) => (x.id === g.id ? { ...x, pct: gpct } : x)));
+                  if (gpct > g.pct) { xp(5, gpct === 100); say(gpct === 100 ? "GOAL ACHIEVED 🏆 +5 XP" : "Progress logged 🎯 +5 XP"); }
+                  await fetch("/api/reflect", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ goalId: g.id, pct: gpct }) });
+                }}>✓</button>
+              </div>
+            ) : (
+              <div className="xpbar"><i style={{ width: g.pct + "%" }} /></div>
+            )}
           </div>
         ))}
         {goals && !goals.length && <p className="empty">No active goals yet.</p>}

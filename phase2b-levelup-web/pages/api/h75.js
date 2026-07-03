@@ -22,13 +22,26 @@ export default async function handler(req, res) {
       queryAll(DB.h75, { filter: { property: "Date", date: { equals: date } } }),
       queryAll(DB.h75, { filter: { property: "Date", date: { on_or_before: date } } }),
     ]);
-    // overall progress: days elapsed + how many were perfect (all 7 checked)
-    const elapsed = allRows.length;
-    let perfect = 0;
-    for (const r of allRows) {
-      if (H75.every(([prop]) => check(r, prop))) perfect++;
+    // overall progress: days elapsed, perfect days, current + longest perfect streaks
+    const sorted = allRows
+      .map((r) => ({ d: r.properties?.Date?.date?.start || "", perfect: H75.every(([prop]) => check(r, prop)) }))
+      .filter((r) => r.d)
+      .sort((a, b) => (a.d < b.d ? -1 : 1));
+    const elapsed = sorted.length;
+    let perfect = 0, longest = 0, run = 0;
+    for (const r of sorted) {
+      if (r.perfect) { perfect++; run++; longest = Math.max(longest, run); }
+      else run = 0;
     }
-    const totals = { elapsed, perfect, total: 75 };
+    // current streak: consecutive perfect days counting back from the end,
+    // ignoring today if it's still in progress (not yet perfect)
+    let current = 0;
+    for (let i = sorted.length - 1; i >= 0; i--) {
+      if (i === sorted.length - 1 && sorted[i].d === date && !sorted[i].perfect) continue;
+      if (sorted[i].perfect) current++;
+      else break;
+    }
+    const totals = { elapsed, perfect, total: 75, current, longest };
     if (!rows.length) return res.status(200).json({ row: null, totals });
     const p = rows[0];
     res.status(200).json({

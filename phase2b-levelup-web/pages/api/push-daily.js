@@ -1,5 +1,5 @@
 import webpush from "web-push";
-import { notion, DB, titleText, text, queryAll } from "../../lib/notion";
+import { notion, DB, H75, titleText, text, sel, check, queryAll } from "../../lib/notion";
 
 const SUBS_DB = "d284b883c1bb4b09931c195f14397bae"; // 🔔 Push Subscriptions
 
@@ -15,16 +15,61 @@ export default async function handler(req, res) {
   webpush.setVapidDetails("mailto:contact@michaelwittstock.com", pub, priv);
 
   try {
+    const today = new Date().toISOString().slice(0, 10);
+    const lines = [];
+
+    // 1) quote of the day
     const favs = await queryAll(DB.quotes, {
       filter: { property: "⭐ Favorite", checkbox: { equals: true } },
     });
     const pool = favs.length ? favs : await queryAll(DB.quotes, {}, 100);
-    if (!pool.length) return res.status(200).json({ sent: 0, note: "no quotes" });
-    const pick = pool[Math.floor(Math.random() * pool.length)];
-    const payload = JSON.stringify({
-      title: "⚡ Today's fuel",
-      body: `“${titleText(pick)}” — ${text(pick, "Author") || "Unknown"}`,
-    });
+    if (pool.length) {
+      const pick = pool[Math.floor(Math.random() * pool.length)];
+      lines.push(`“${titleText(pick)}” — ${text(pick, "Author") || "Unknown"}`);
+    }
+
+    // 2) reminders due today (or overdue), not done
+    try {
+      const due = await queryAll(DB.reminders, {
+        filter: {
+          and: [
+            { property: "Date", date: { on_or_before: today } },
+            { property: "Done", checkbox: { equals: false } },
+          ],
+        },
+      });
+      if (due.length) {
+        const names = due.slice(0, 3).map(titleText).join(", ");
+        lines.push(`⏰ ${due.length} reminder${due.length > 1 ? "s" : ""}: ${names}${due.length > 3 ? "…" : ""}`);
+      }
+    } catch {}
+
+    // 3) Mila dues
+    try {
+      const mila = await queryAll(DB.mila);
+      const dueM = mila.filter((p) => {
+        const last = p.properties?.["Last Done"]?.date?.start;
+        const days = last ? Math.floor((new Date(today) - new Date(last)) / 86400000) : Infinity;
+        const f = sel(p, "Frequency");
+        return f.includes("Daily") ? days >= 1 : f.includes("Weekly") ? days >= 7 : days >= 30;
+      });
+      if (dueM.length) lines.push(`🐶 Mila: ${dueM.length} due (${dueM.slice(0, 2).map(titleText).join(", ")}${dueM.length > 2 ? "…" : ""})`);
+    } catch {}
+
+    // 4) Sunday: week recap teaser
+    try {
+      if (new Date().getUTCDay() === 0) {
+        const weekStart = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+        const week = await queryAll(DB.h75, {
+          filter: { and: [{ property: "Date", date: { on_or_after: weekStart } }, { property: "Date", date: { on_or_before: today } }] },
+        });
+        const perf = week.filter((r) => H75.every(([prop]) => check(r, prop))).length;
+        lines.push(`📊 This week: ${perf}/7 perfect days — full recap lands in Notion at 6pm.`);
+      }
+    } catch {}
+
+    if (!lines.length) return res.status(200).json({ sent: 0, note: "nothing to send" });
+    const payload = JSON.stringify({ title: "⚡ Morning fuel", body: lines.join("\n") });
 
     const subs = await queryAll(SUBS_DB);
     let sent = 0, removed = 0;

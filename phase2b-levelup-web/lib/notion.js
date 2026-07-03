@@ -15,6 +15,8 @@ export const DB = {
   grat:     "b4aa46dcb40f46408f124980b6d67f9e", // 🙏 Gratitude & Wins
   courses:  "8d662e89dddb479596d83dfe1316fed8", // 📚 Courses
   library:  "9c4b369ee79b46e49f328869cd679c2d", // 📖 Library
+  reminders:"d18c69d5c18e4ed696f858ea490943e1", // ⏰ Reminders
+  mila:     "5c960914323d4abe88744acf3894fb80", // 🐶 Mila Care
 };
 
 // The 7 daily 75 Hard checkboxes: [notion property, display label]

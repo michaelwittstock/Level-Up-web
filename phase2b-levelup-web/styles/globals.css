@@ -239,6 +239,10 @@ hr { border: none; border-top: 1px solid var(--line); margin: 12px 0; }
 .addtask input { flex: 1; margin-bottom: 0; }
 .addtask .btn { padding: 11px 12px; font-size: 0.8rem; white-space: nowrap; }
 .hrow.duerow { border-color: var(--yellow); }
+.milestone {
+  background: rgba(245, 197, 24, 0.1); border: 1px solid rgba(245, 197, 24, 0.45); color: var(--yellow);
+  font-weight: 800; padding: 10px 12px; border-radius: 10px; font-size: 0.9rem; margin: 0 0 12px;
+}
 .hrow.duerow .box { border-color: var(--yellow); }
 .hrow.on .sub, .hrow.duerow .sub { flex: 0 0 auto; }
 
