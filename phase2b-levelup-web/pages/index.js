@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import Head from "next/head";
 
-const VERSION = "v5.5";
+const VERSION = "v6.0";
 const MDM_PAGE = "160fcb70586380d7afcbefb75870943e"; // 🌅 Million Dollar Morning (Brad Lea)
 const WUW_PAGE = "160fcb705863804c9815cf77fccca91f"; // ⚔️ Wake Up Warrior
 const MILA_GUIDE = "391fcb70586381609bf8ecaf23378d9d"; // 🐶 Mila — Best Life Guide
@@ -81,24 +81,22 @@ export default function Home() {
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="theme-color" content="#0b0d12" />
+        <meta name="theme-color" content="#050507" />
         <link rel="manifest" href="/manifest.json" />
         <link rel="apple-touch-icon" href="/icon-180.png" />
         <link rel="icon" href="/icon-180.png" />
       </Head>
 
       <header className="hero">
-        <div className="hero-top">
-          <div>
-            <div className="hello">Let&rsquo;s go, Michael</div>
-            <div className="date">{new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}</div>
-          </div>
-          <div className="lvl">
-            <div className="lvlname">Lv {lv} · {TITLES[Math.min(lv - 1, TITLES.length - 1)]}</div>
-            <div className="xpbar"><i style={{ width: into + "%" }} /></div>
-            <div className="xptext">{into}/100 XP · 🔥 {S.streak} day streak · 🏆 {S.wins}</div>
-          </div>
+        <div className="date">{new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}</div>
+        <div className="hello">Let&rsquo;s go, Michael</div>
+        <div className="bignum">🔥 {S.streak}<span className="bignum-l">day streak</span></div>
+        <div className="pills">
+          <span className="pill">Lv {lv} · {TITLES[Math.min(lv - 1, TITLES.length - 1)]}</span>
+          <span className="pill">⚡ {into}/100 XP</span>
+          <span className="pill">🏆 {S.wins} wins</span>
         </div>
+        <div className="xpbar" style={{ marginTop: 10 }}><i style={{ width: into + "%" }} /></div>
         <nav className="tabs">
           {TABS.map(([k, label]) => (
             <button key={k} className={"tab" + (tab === k ? " on" : "")} onClick={() => setTab(k)}>{label}</button>
@@ -106,7 +104,7 @@ export default function Home() {
         </nav>
       </header>
 
-      <main>
+      <main key={tab}>
         {tab === "today" && <Today xp={xp} say={say} openPage={setReader} />}
         {tab === "h75" && <><WorkoutTimer xp={xp} say={say} /><QuoteRotator match="Frisella" label="🗣️ Frisella fuel" /><H75 xp={xp} say={say} openPage={setReader} /></>}
         {tab === "focus" && <Focus xp={xp} say={say} S={S} save={save} />}
