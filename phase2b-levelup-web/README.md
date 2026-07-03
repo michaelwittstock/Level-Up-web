@@ -55,3 +55,23 @@ Everything else (NOTION_TOKEN, framework preset) is already set up from v1.
 
 That property name probably changed in Notion. Open `lib/notion.js` / the matching
 `pages/api/*.js` and make sure names match your Notion columns exactly (emoji included).
+
+
+## v6.4 additions
+
+**🥊 AI Coach (Today tab)** — needs `ANTHROPIC_API_KEY` in Vercel → Settings → Environment Variables
+(create one at console.anthropic.com). Optional: `ANTHROPIC_MODEL` to override the default Haiku model.
+
+**📱 iPhone steps → Energy log** — set `HEALTH_KEY` in Vercel to any random string, redeploy, then on your
+iPhone: Shortcuts → Automation → Daily at 9:00 PM → New Blank Automation:
+1. "Find Health Samples" — Type: Steps, Start Date: is today (or "Get Numbers of Steps" if available)
+2. "Calculate Statistics" — Sum
+3. "Get Contents of URL" — `https://YOUR-APP.vercel.app/api/health?key=YOUR_HEALTH_KEY&steps=` + Statistics result
+Your daily steps land in the Steps column of 🔋 Energy & Sleep automatically.
+
+**📈 Net worth history** — on the 1st of each month the daily cron snapshots your Net Worth into
+📈 Net Worth History in Notion, and the Money card shows the trend.
+
+**🔄 Pull to refresh** — on your phone, drag down from the top of any tab to reload every card.
+**📳 Haptics** — small vibrations on completions (Android/supported browsers; iOS Safari doesn't expose vibration).
+**🔥 75 Hard auto-restart** — miss a day and the app restarts your attempt count automatically (your Notion rows keep their original labels). Finishing the 45-min timer now auto-checks 💪 Workout 1.

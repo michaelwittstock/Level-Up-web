@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import Head from "next/head";
 
-const VERSION = "v6.0";
+const VERSION = "v6.4";
 const MDM_PAGE = "160fcb70586380d7afcbefb75870943e"; // 🌅 Million Dollar Morning (Brad Lea)
 const WUW_PAGE = "160fcb705863804c9815cf77fccca91f"; // ⚔️ Wake Up Warrior
 const MILA_GUIDE = "391fcb70586381609bf8ecaf23378d9d"; // 🐶 Mila — Best Life Guide
@@ -21,6 +21,33 @@ function todayStr() {
 }
 function mmss(s) {
   return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+}
+// haptics — buzz on Android/supported browsers, silently no-op on iOS
+function buzz(p) {
+  try { if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(p); } catch {}
+}
+// shared pull-to-refresh signal: any data card can subscribe its loader
+function useAppRefresh(load) {
+  useEffect(() => {
+    const f = () => load();
+    window.addEventListener("app-refresh", f);
+    return () => window.removeEventListener("app-refresh", f);
+  }, [load]);
+}
+// after the 45-min timer finishes, check off "💪 Workout 1" on today's 75 Hard row
+async function autoCheckWorkout(say) {
+  try {
+    const j = await (await fetch("/api/h75?date=" + todayStr())).json();
+    const it = j.row?.items?.find((i) => i.prop === "💪 Workout 1");
+    if (j.row && it && !it.on) {
+      await fetch("/api/h75", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: j.row.id, prop: "💪 Workout 1", on: true }),
+      });
+      say("Workout 1 checked off for you ✅");
+      window.dispatchEvent(new Event("h75-refresh"));
+    }
+  } catch {}
 }
 // instant-load cache: render last known data immediately, refresh in background
 function lsGet(k) {
@@ -44,18 +71,56 @@ export default function Home() {
   const [S, setS] = useState(loadS);
   const [toast, setToast] = useState("");
   const [reader, setReader] = useState(null); // {id, title}
+  const [pull, setPull] = useState(0); // px pulled at top · -1 = refreshing
   const toastT = useRef(null);
+
+  // pull-to-refresh (mobile): drag down from the very top to reload every card
+  useEffect(() => {
+    let startY = null, pulling = false;
+    const ts = (e) => {
+      if (window.scrollY <= 0 && !e.target.closest?.(".overlay")) {
+        startY = e.touches[0].clientY; pulling = true;
+      } else pulling = false;
+    };
+    const tm = (e) => {
+      if (!pulling || startY === null || window.scrollY > 0) return;
+      const dy = e.touches[0].clientY - startY;
+      setPull(dy > 12 ? Math.min(90, dy - 12) : 0);
+    };
+    const te = () => {
+      setPull((p) => {
+        if (p >= 70) {
+          buzz(20);
+          window.dispatchEvent(new Event("app-refresh"));
+          setTimeout(() => setPull(0), 900);
+          return -1;
+        }
+        return 0;
+      });
+      startY = null; pulling = false;
+    };
+    window.addEventListener("touchstart", ts, { passive: true });
+    window.addEventListener("touchmove", tm, { passive: true });
+    window.addEventListener("touchend", te);
+    return () => {
+      window.removeEventListener("touchstart", ts);
+      window.removeEventListener("touchmove", tm);
+      window.removeEventListener("touchend", te);
+    };
+  }, []);
 
   const save = useCallback((next) => {
     setS(next);
     try { localStorage.setItem("levelup-web", JSON.stringify(next)); } catch {}
   }, []);
   const say = useCallback((m) => {
+    buzz(15);
     setToast(m);
     clearTimeout(toastT.current);
     toastT.current = setTimeout(() => setToast(""), 2000);
   }, []);
   const xp = useCallback((n, winToo) => {
+    buzz(winToo ? [40, 60, 40] : 8);
     setS((prev) => {
       const t = todayStr();
       let streak = prev.streak, lastDay = prev.lastDay;
@@ -87,6 +152,9 @@ export default function Home() {
         <link rel="icon" href="/icon-180.png" />
       </Head>
 
+      <div className={"ptr" + (pull === -1 ? " go" : "")} style={pull > 0 ? { height: Math.round(pull * 0.55) } : undefined}>
+        {pull === -1 ? "↻ Refreshing…" : pull >= 70 ? "↑ Release to refresh" : pull > 0 ? "↓ Pull to refresh" : ""}
+      </div>
       <header className="hero">
         <div className="date">{new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}</div>
         <div className="hello">Let&rsquo;s go, Michael</div>
@@ -258,6 +326,7 @@ function Today({ xp, say, openPage }) {
     } catch { if (cc === undefined) setCal(null); }
   }, []);
   useEffect(() => { load(); }, [load]);
+  useAppRefresh(load);
 
   async function done(id) {
     setData((d) => ({ ...d, tasks: d.tasks.filter((t) => t.id !== id) }));
@@ -350,7 +419,58 @@ function Today({ xp, say, openPage }) {
         ) : null
       )}
       <Mila xp={xp} say={say} openPage={openPage} />
+      <Coach say={say} />
     </>
+  );
+}
+
+// ================= COACH 🥊 =================
+function Coach({ say }) {
+  const [msgs, setMsgs] = useState(() => lsGet("coach") || []);
+  const [txt, setTxt] = useState("");
+  const [busy, setBusy] = useState(false);
+  const endRef = useRef(null);
+  useEffect(() => { endRef.current?.scrollIntoView({ block: "nearest" }); }, [msgs, busy]);
+
+  async function send() {
+    const t = txt.trim();
+    if (!t || busy) return;
+    const next = [...msgs, { role: "user", content: t }];
+    setMsgs(next); lsSet("coach", next.slice(-30)); setTxt(""); setBusy(true);
+    try {
+      const j = await (await fetch("/api/coach", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: next.slice(-12) }),
+      })).json();
+      if (j.error) throw new Error(j.error);
+      const withReply = [...next, { role: "assistant", content: j.reply }];
+      setMsgs(withReply); lsSet("coach", withReply.slice(-30)); buzz(12);
+    } catch (e) { say("Coach unavailable — " + e.message); }
+    setBusy(false);
+  }
+
+  return (
+    <section>
+      <h2>🥊 Coach <span className="sub">in your corner</span></h2>
+      {!msgs.length && (
+        <p className="empty">Goggins intensity, Jocko discipline — and he can see your 75 Hard, energy and goals. Try: &ldquo;I don&rsquo;t feel like working out.&rdquo;</p>
+      )}
+      <div className="chat">
+        {msgs.slice(-8).map((m, i) => (
+          <div key={i} className={"bubble " + (m.role === "user" ? "me" : "them")}>{m.content}</div>
+        ))}
+        {busy && <div className="bubble them">…</div>}
+        <div ref={endRef} />
+      </div>
+      <div className="addtask">
+        <input value={txt} onChange={(e) => setTxt(e.target.value)} placeholder="Talk to your coach…"
+          onKeyDown={(e) => e.key === "Enter" && send()} />
+        <button className="btn" disabled={busy} onClick={send}>{busy ? "…" : "Send"}</button>
+      </div>
+      {msgs.length > 0 && (
+        <button className="btn sec" style={{ marginTop: 8 }} onClick={() => { setMsgs([]); lsSet("coach", []); }}>Clear chat</button>
+      )}
+    </section>
   );
 }
 
@@ -394,6 +514,7 @@ function Mila({ xp, say, openPage }) {
     } catch {}
   }, []);
   useEffect(() => { load(); }, [load]);
+  useAppRefresh(load);
 
   function daysSince(last) {
     if (!last) return Infinity;
@@ -567,6 +688,12 @@ function H75({ xp, say, openPage }) {
     } catch (e) { if (!cp) setPlans({ error: e.message }); }
   }, []);
   useEffect(() => { load(); }, [load]);
+  useAppRefresh(load);
+  useEffect(() => {
+    const f = () => load();
+    window.addEventListener("h75-refresh", f);
+    return () => window.removeEventListener("h75-refresh", f);
+  }, [load]);
 
   async function toggle(item) {
     const on = !item.on;
@@ -585,7 +712,11 @@ function H75({ xp, say, openPage }) {
       {row === null && <p className="empty">No 75 Hard row for today — check your tracker dates in Notion.</p>}
       {row && (
         <section>
-          <h2>{row.day} of 75 <span className="sub">{done}/7</span></h2>
+          <h2>{totals?.attemptDay ? "Day " + totals.attemptDay + " of 75" : row.day + " of 75"}{" "}
+            <span className="sub">{done}/7{totals?.resets > 0 ? " · restart #" + totals.resets : ""}</span></h2>
+          {totals?.resets > 0 && totals.attemptDay <= 3 && (
+            <p className="milestone">🧹 Clean slate — Day {totals.attemptDay} of attempt #{totals.resets + 1}. A missed day isn&rsquo;t the end, it&rsquo;s the restart. 🔥</p>
+          )}
           <div className="ringwrap"><div className="ring" style={{ "--frac": done / 7 }}><b>{done}/7</b></div></div>
           <div className="h75grid">
             {row.items.map((i) => (
@@ -599,7 +730,7 @@ function H75({ xp, say, openPage }) {
       )}
       {totals && (
         <section>
-          <h2>🏆 Challenge progress <span className="sub">day {totals.elapsed} of {totals.total}</span></h2>
+          <h2>🏆 Challenge progress <span className="sub">day {totals.attemptDay ?? totals.elapsed} of {totals.total}</span></h2>
           {[75, 50, 25].filter((m) => totals.current >= m).slice(0, 1).map((m) => (
             <p key={m} className="milestone">🎉 Day {m} milestone — {m === 75 ? "YOU FINISHED. Unbreakable." : m === 50 ? "two-thirds territory. Relentless." : "quarter mark. Momentum is real."}</p>
           ))}
@@ -607,7 +738,7 @@ function H75({ xp, say, openPage }) {
             <div><span className="sub">Streak</span><b style={{ color: "var(--yellow)" }}>🔥 {totals.current || 0}</b></div>
             <div><span className="sub">Longest</span><b>{totals.longest || 0}</b></div>
             <div><span className="sub">Perfect</span><b className="pos">{totals.perfect}</b></div>
-            <div><span className="sub">To go</span><b className="neg">{Math.max(0, totals.total - totals.elapsed)}</b></div>
+            <div><span className="sub">To go</span><b className="neg">{Math.max(0, totals.total - (totals.attemptDay ?? totals.elapsed))}</b></div>
           </div>
           <div className="xpbar" style={{ marginTop: 10 }}><i style={{ width: Math.min(100, (totals.perfect / totals.total) * 100) + "%" }} /></div>
           <p className="empty" style={{ marginTop: 6 }}>{totals.perfect} of {totals.total} perfect days banked · <a href="/share" target="_blank" rel="noopener noreferrer" style={{ color: "var(--mut)" }}>public scoreboard ↗</a></p>
@@ -666,7 +797,7 @@ function useTimer(total, onDone) {
 }
 
 function WorkoutTimer({ xp, say }) {
-  const work = useTimer(45 * 60, () => { xp(20, true); say("Workout complete! +20 XP 🔥 Check it off above"); });
+  const work = useTimer(45 * 60, () => { xp(20, true); buzz([80, 50, 80]); say("Workout complete! +20 XP 🔥"); autoCheckWorkout(say); });
   return (
     <section>
       <h2>⏱️ 45-min workout timer <span className="sub">counts toward today</span></h2>
@@ -685,7 +816,7 @@ function Focus({ xp, say, S, save }) {
     if (mode === 25) { save({ ...S, pomo: (S.pomoDay === todayStr() ? S.pomo : 0) + 1, pomoDay: todayStr() }); xp(10, false); say("Pomodoro done! +10 XP 🍅"); }
     else say("Break over — back to it 💪");
   });
-  const work = useTimer(45 * 60, () => { xp(20, true); say("Workout complete! +20 XP 🔥 Check it in 75 Hard"); });
+  const work = useTimer(45 * 60, () => { xp(20, true); buzz([80, 50, 80]); say("Workout complete! +20 XP 🔥"); autoCheckWorkout(say); });
   function pick(m) { setMode(m); pomo.reset(m * 60); }
   const pomoCount = S.pomoDay === todayStr() ? S.pomo : 0;
 
@@ -762,6 +893,7 @@ function Learn({ openPage }) {
     } catch (e) { if (!c) setErr(e.message); }
   }, []);
   useEffect(() => { load(); }, [load]);
+  useAppRefresh(load);
 
   function shuffle() {
     if (data?.quotes?.length) setQ(data.quotes[Math.floor(Math.random() * data.quotes.length)]);
@@ -867,6 +999,7 @@ function Reflect({ xp, say }) {
     } catch (e) { setErr(e.message); }
   }, []);
   useEffect(() => { load(); }, [load]);
+  useAppRefresh(load);
 
   async function saveGrat() {
     if (!g1.trim() && !win.trim()) { say("Add a gratitude or win first 🙂"); return; }
@@ -999,6 +1132,7 @@ function Money({ say }) {
     } catch (e) { if (!c) setErr(e.message); }
   }, []);
   useEffect(() => { load(); }, [load]);
+  useAppRefresh(load);
 
   const fmt = (n) => "$" + Math.round(n).toLocaleString();
 
@@ -1028,6 +1162,24 @@ function Money({ say }) {
             <div><span className="sub">Assets</span><b className="pos">{fmt(data.assets)}</b></div>
             <div><span className="sub">Debts</span><b className="neg">{fmt(data.liabilities)}</b></div>
           </div>
+          {data.history?.length > 1 && (
+            <>
+              <div className="chartlbl">📈 Net worth — last {data.history.length} months</div>
+              <div className="chart">
+                {(() => {
+                  const vals = data.history.map((h) => h.net);
+                  const mn = Math.min(...vals), mx = Math.max(...vals);
+                  return data.history.map((h, i) => (
+                    <div className="cbarwrap" key={i} title={h.month + " · " + fmt(h.net)}>
+                      <div className={"cbar " + (h.net >= 0 ? "perfb" : "h75b")}
+                        style={{ height: (mx === mn ? 60 : 15 + ((h.net - mn) / (mx - mn)) * 85) + "%" }} />
+                      <span className="cday">{(h.date || "").slice(2, 7)}</span>
+                    </div>
+                  ));
+                })()}
+              </div>
+            </>
+          )}
           {data.items.map((i) => (
             <div className="mrow" key={i.id}>
               <span className="mi">{i.type.includes("Asset") ? "🟢" : "🔴"} {i.item}</span>
@@ -1065,6 +1217,7 @@ function Stats() {
     } catch (e) { if (!c) setErr(e.message); }
   }, [days]);
   useEffect(() => { load(); }, [load]);
+  useAppRefresh(load);
 
   const hasEnergy = data?.energy?.length > 0;
   const hasH75 = data?.h75?.length > 0;

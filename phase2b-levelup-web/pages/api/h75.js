@@ -41,7 +41,14 @@ export default async function handler(req, res) {
       if (sorted[i].perfect) current++;
       else break;
     }
-    const totals = { elapsed, perfect, total: 75, current, longest };
+    // attempt-aware: any PAST day with <7 checks fails the attempt; it restarts the next day.
+    // (Notion rows keep their original Day labels — this only changes what we display.)
+    let attemptStartIdx = 0, resets = 0;
+    for (let i = 0; i < sorted.length; i++) {
+      if (sorted[i].d < date && !sorted[i].perfect) { attemptStartIdx = i + 1; resets++; }
+    }
+    const attemptDay = sorted.length - attemptStartIdx;
+    const totals = { elapsed, perfect, total: 75, current, longest, attemptDay, resets };
     if (!rows.length) return res.status(200).json({ row: null, totals });
     const p = rows[0];
     res.status(200).json({

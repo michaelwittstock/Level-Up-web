@@ -68,6 +68,30 @@ export default async function handler(req, res) {
       }
     } catch {}
 
+    // 5) 1st of the month: snapshot net worth into 📈 Net Worth History
+    try {
+      if (new Date().getUTCDate() === 1) {
+        const NW_DB = "081ec9b7fbaf434f8d32c6509d4e3ee1";
+        const HIST_DB = "501d1cc52bdd469383a92ecf0fd571bb";
+        const rows = await queryAll(NW_DB);
+        const val = (p) => p.properties?.Value?.number || 0;
+        const assets = rows.filter((p) => (sel(p, "Type") || "").includes("Asset")).reduce((s, p) => s + val(p), 0);
+        const liab = rows.filter((p) => (sel(p, "Type") || "").includes("Liability")).reduce((s, p) => s + val(p), 0);
+        const label = new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" });
+        await notion.pages.create({
+          parent: { database_id: HIST_DB },
+          properties: {
+            Month: { title: [{ text: { content: label } }] },
+            Date: { date: { start: today } },
+            Assets: { number: assets },
+            Liabilities: { number: liab },
+            Net: { number: assets - liab },
+          },
+        });
+        lines.push(`🧾 New month — net worth snapshot saved: $${Math.round(assets - liab).toLocaleString()} net.`);
+      }
+    } catch {}
+
     if (!lines.length) return res.status(200).json({ sent: 0, note: "nothing to send" });
     const payload = JSON.stringify({ title: "⚡ Morning fuel", body: lines.join("\n") });
 
