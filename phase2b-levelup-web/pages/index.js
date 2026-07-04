@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import Head from "next/head";
 
-const VERSION = "v6.6";
+const VERSION = "v1.00";
 // tiny haptics — no-op where unsupported (iOS Safari)
 function buzz(pattern) { try { navigator.vibrate && navigator.vibrate(pattern); } catch {} }
 const MDM_PAGE = "160fcb70586380d7afcbefb75870943e"; // 🌅 Million Dollar Morning (Brad Lea)
@@ -93,8 +93,26 @@ export default function Home() {
   const lv = Math.floor(S.xp / 100) + 1;
   const into = S.xp % 100;
 
+  // light/dark: follow saved choice, else the system
+  const [theme, setTheme] = useState("dark");
+  useEffect(() => {
+    const saved = localStorage.getItem("theme");
+    const sysLight = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches;
+    const t = saved || (sysLight ? "light" : "dark");
+    setTheme(t);
+    document.documentElement.dataset.theme = t;
+  }, []);
+  function flipTheme() {
+    const t = theme === "dark" ? "light" : "dark";
+    setTheme(t);
+    document.documentElement.dataset.theme = t;
+    try { localStorage.setItem("theme", t); } catch {}
+    buzz(10);
+  }
+
   return (
     <div className="app">
+      <button className="themebtn" onClick={flipTheme} title="Light / dark">{theme === "dark" ? "☀️" : "🌙"}</button>
       <Head>
         <title>Level Up</title>
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -125,16 +143,17 @@ export default function Home() {
 
       <main key={tab}>
         {tab === "today" && <Today xp={xp} say={say} openPage={setReader} />}
-        {tab === "h75" && <><WorkoutTimer xp={xp} say={say} /><QuoteRotator match="Frisella" label="🗣️ Frisella fuel" /><H75 xp={xp} say={say} openPage={setReader} /></>}
+        {tab === "h75" && <><WorkoutTimer xp={xp} say={say} /><QuoteRotator match="Frisella" label="🗣️ Frisella fuel" /><H75 xp={xp} say={say} openPage={setReader} /><PRCard xp={xp} say={say} /></>}
         {tab === "focus" && <Focus xp={xp} say={say} S={S} save={save} />}
-        {tab === "learn" && <Learn openPage={setReader} />}
+        {tab === "learn" && <><Flashcards xp={xp} say={say} /><Learn openPage={setReader} /></>}
         {tab === "reflect" && <Reflect xp={xp} say={say} />}
         {tab === "journal" && <Journal xp={xp} say={say} />}
       </main>
 
       <footer className="foot">
         Personal Level Up {VERSION} · synced with your Notion ·{" "}
-        <a href="https://app.notion.com/p/390fcb70586381878204cfabca02ad93" target="_blank" rel="noopener noreferrer">Open hub ↗</a>
+        <a href="https://app.notion.com/p/390fcb70586381878204cfabca02ad93" target="_blank" rel="noopener noreferrer">Open hub ↗</a>{" "}
+        · <a href="/report" target="_blank" rel="noopener noreferrer">📄 Life Report</a>
       </footer>
       {toast && <div className="toast show">{toast}</div>}
       {reader && <Reader id={reader.id} fallbackTitle={reader.title} close={() => setReader(null)} say={say} />}
@@ -203,6 +222,7 @@ function Reader({ id, fallbackTitle, close, say }) {
               return <a key={i} className="rlink" href={b.url} target="_blank" rel="noopener noreferrer">▶ Open video ↗</a>;
             }
             if (b.kind === "link") return <a key={i} className="rlink" href={b.url} target="_blank" rel="noopener noreferrer">🔗 {b.text}</a>;
+            if (/^\s*Answers?\s*:/i.test(b.text || "")) return <AnswerReveal key={i} text={b.text} />;
             return <p key={i} className="rp" style={{ marginLeft: b.indent ? 12 : 0 }}>{b.text}</p>;
           })}
           {data && !data.blocks?.length && <p className="empty">This page is empty.</p>}
@@ -214,6 +234,13 @@ function Reader({ id, fallbackTitle, close, say }) {
       </div>
     </div>
   );
+}
+
+// quiz answers stay hidden until you've actually tried
+function AnswerReveal({ text }) {
+  const [open, setOpen] = useState(false);
+  if (open) return <div className="rquote">{text}</div>;
+  return <button className="reveal" onClick={() => setOpen(true)}>🧠 Answer the questions first — then tap to reveal</button>;
 }
 
 // ================= BREATHE (box breathing w/ haptics) =================
@@ -426,6 +453,192 @@ function Today({ xp, say, openPage }) {
   );
 }
 
+// ================= MILA ALBUM =================
+function MilaAlbum() {
+  const [photos, setPhotos] = useState(null);
+  useEffect(() => {
+    (async () => {
+      try {
+        const j = await (await fetch("/api/mila-album")).json();
+        if (!j.error) setPhotos(j.photos);
+      } catch {}
+    })();
+  }, []);
+  if (!photos?.length) return (
+    <p className="empty" style={{ margin: "0 0 10px" }}>📸 Photo-a-week: add pics to the <b>Mila Album</b> in Notion and they show up here.</p>
+  );
+  return (
+    <div className="albumstrip">
+      {photos.map((p, i) => (
+        <figure key={i} className="albumitem">
+          <img src={p.url} alt={p.caption} loading="lazy" />
+          <figcaption>{p.caption}{p.date ? " · " + p.date.slice(5).replace("-", "/") : ""}</figcaption>
+        </figure>
+      ))}
+    </div>
+  );
+}
+
+// ================= FLASHCARDS (Leitner spaced repetition) =================
+const BOX_DAYS = [1, 2, 4, 9, 21];
+function cardKey(c) { let h = 0; for (const ch of c.book + c.lesson) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return "fc:" + h; }
+function Flashcards({ xp, say }) {
+  const [pool, setPool] = useState(null);
+  const [cur, setCur] = useState(null);
+  const [open, setOpen] = useState(false);
+  const [doneToday, setDoneToday] = useState(0);
+
+  const pickNext = useCallback((cards) => {
+    const now = Date.now();
+    const due = cards.filter((c) => {
+      const s = lsGet(cardKey(c));
+      return !s || s.due <= now;
+    });
+    setCur(due.length ? due[Math.floor(Math.random() * due.length)] : null);
+    setOpen(false);
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      const c = lsGet("fcpool");
+      if (c?.length) { setPool(c); pickNext(c); }
+      try {
+        const j = await (await fetch("/api/flashcards")).json();
+        if (j.cards?.length) { setPool(j.cards); lsSet("fcpool", j.cards); if (!c?.length) pickNext(j.cards); }
+      } catch {}
+    })();
+  }, [pickNext]);
+
+  function grade(good) {
+    const s = lsGet(cardKey(cur)) || { box: 0 };
+    const box = good ? Math.min(s.box + 1, BOX_DAYS.length - 1) : 0;
+    lsSet(cardKey(cur), { box, due: Date.now() + BOX_DAYS[box] * 86400000 });
+    if (good) { xp(2, false); }
+    setDoneToday((d) => d + 1);
+    buzz(10);
+    pickNext(pool);
+  }
+
+  if (pool === null) return null;
+  return (
+    <section>
+      <h2>🃏 Daily flashcards <span className="sub">{doneToday ? doneToday + " reviewed" : "2-min brain reps"}</span></h2>
+      {!cur && <p className="empty">All caught up for now — cards come back on their schedule. 🎉</p>}
+      {cur && (
+        <>
+          <p className="empty" style={{ marginBottom: 6 }}>From <b>{cur.book}</b> — do you remember this lesson?</p>
+          {open ? (
+            <>
+              <div className="rquote" style={{ fontSize: "1.02rem" }}>{cur.lesson}</div>
+              <div className="tbtns" style={{ justifyContent: "flex-start", marginTop: 10 }}>
+                <button className="btn" onClick={() => grade(true)}>✅ Knew it (+2 XP)</button>
+                <button className="btn sec" onClick={() => grade(false)}>🔁 Show me again soon</button>
+              </div>
+            </>
+          ) : (
+            <button className="reveal" onClick={() => { setOpen(true); buzz(8); }}>Think first… then tap to flip</button>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
+// ================= PR TRACKER =================
+const LIFTS = ["Bench", "Squat", "Deadlift", "Overhead Press", "Row", "Other"];
+function PRCard({ xp, say }) {
+  const [data, setData] = useState(null);
+  const [lift, setLift] = useState("Bench");
+  const [w, setW] = useState("");
+  const [reps, setReps] = useState("");
+  const [busy, setBusy] = useState(false);
+  const load = useCallback(async () => {
+    const c = lsGet("pr");
+    if (c) setData(c);
+    try {
+      const j = await (await fetch("/api/pr")).json();
+      if (!j.error) { setData(j); lsSet("pr", j); }
+    } catch {}
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  async function log() {
+    if (!(+w > 0) || !(+reps > 0) || busy) { say("Weight + reps first 🏋️"); return; }
+    setBusy(true);
+    try {
+      const j = await (await fetch("/api/pr", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lift, weight: +w, reps: +reps }),
+      })).json();
+      if (j.error) throw new Error(j.error);
+      if (j.pr) { xp(15, true); buzz([80, 50, 80]); say(`NEW ${lift.toUpperCase()} PR — ${w} lbs! 🏆 +15 XP`); }
+      else { xp(5, false); say("Logged 🏋️ +5 XP"); }
+      setW(""); setReps("");
+      load();
+    } catch { say("Couldn't log — try again"); }
+    setBusy(false);
+  }
+
+  return (
+    <section>
+      <h2>🏋️ PR tracker <span className="sub">bests per lift</span></h2>
+      {data?.bests && Object.keys(data.bests).length > 0 && (
+        <div className="networth">
+          {Object.entries(data.bests).slice(0, 4).map(([l, b]) => (
+            <div key={l}><span className="sub">{l}</span><b>{b.weight}<span style={{ fontSize: "0.7rem", color: "var(--mut)" }}> ×{b.reps}</span></b></div>
+          ))}
+        </div>
+      )}
+      <div className="modes">
+        {LIFTS.map((l) => (
+          <button key={l} className={"modechip" + (lift === l ? " on" : "")} onClick={() => setLift(l)}>{l}</button>
+        ))}
+      </div>
+      <div className="erow">
+        <input className="enum" type="number" placeholder="lbs" value={w} onChange={(e) => setW(e.target.value)} />
+        <input className="enum" type="number" placeholder="reps" value={reps} onChange={(e) => setReps(e.target.value)} />
+        <button className="btn" disabled={busy} onClick={log}>{busy ? "…" : "Log"}</button>
+      </div>
+    </section>
+  );
+}
+
+// ================= COMPOUND GROWTH =================
+function CompoundCalc() {
+  const [m, setM] = useState(500);
+  const [r, setR] = useState(8);
+  const [y, setY] = useState(20);
+  const fmt = (n) => "$" + Math.round(n).toLocaleString();
+  let bal = 0;
+  const yearly = [];
+  const mr = r / 100 / 12;
+  for (let mo = 1; mo <= y * 12; mo++) { bal = bal * (1 + mr) + m; if (mo % 12 === 0) yearly.push(bal); }
+  const contrib = m * 12 * y;
+  const max = yearly[yearly.length - 1] || 1;
+  const k = Math.ceil(yearly.length / 8);
+  return (
+    <section>
+      <h2>📈 Compound machine <span className="sub">think big enough</span></h2>
+      <div className="erow"><label>Monthly</label><input className="eslide" type="range" min="50" max="5000" step="50" value={m} onChange={(e) => setM(+e.target.value)} /><b style={{ minWidth: 64 }}>{fmt(m)}</b></div>
+      <div className="erow"><label>Return</label><input className="eslide" type="range" min="1" max="15" step="0.5" value={r} onChange={(e) => setR(+e.target.value)} /><b style={{ minWidth: 64 }}>{r}%</b></div>
+      <div className="erow"><label>Years</label><input className="eslide" type="range" min="1" max="40" step="1" value={y} onChange={(e) => setY(+e.target.value)} /><b style={{ minWidth: 64 }}>{y}</b></div>
+      <div className="networth" style={{ marginTop: 14 }}>
+        <div><span className="sub">Future value</span><b className="pos">{fmt(bal)}</b></div>
+        <div><span className="sub">You put in</span><b>{fmt(contrib)}</b></div>
+        <div><span className="sub">Growth did</span><b className="pos">{fmt(bal - contrib)}</b></div>
+      </div>
+      <div className="chart" style={{ height: 70 }}>
+        {yearly.map((v, i) => (
+          <div className="cbarwrap" key={i} title={"Year " + (i + 1) + ": " + fmt(v)}>
+            <div className={"cbar " + (m * 12 * (i + 1) > v * 0.85 ? "h75b" : "perfb")} style={{ height: (v / max) * 100 + "%" }} />
+            {i % k === 0 && <span className="cday">y{i + 1}</span>}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 // ================= AI COACH =================
 function Coach() {
   const [msgs, setMsgs] = useState(() => lsGet("coach") || []);
@@ -532,6 +745,7 @@ function Mila({ xp, say, openPage }) {
       <button className="storylink" onClick={() => openPage({ id: MILA_GUIDE, title: "🐶 Mila — Best Life Guide" })}>
         📖 Her Best Life guide — breed care, food rules, back safety
       </button>
+      <MilaAlbum />
       {order.map((f) => {
         const group = items.filter((i) => i.freq === f);
         if (!group.length) return null;
@@ -1021,6 +1235,7 @@ function Reflect({ xp, say }) {
       <EnergyLog xp={xp} say={say} />
       <Stats />
       <Money say={say} />
+      <CompoundCalc />
       <section>
         <h2>🎯 Goals <span className="sub">{goals ? goals.length + " active" : "…"}</span></h2>
         {err && <Err retry={load} msg={err} />}
@@ -1327,9 +1542,29 @@ function Journal({ xp, say }) {
   const [title, setTitle] = useState("");
   const [area, setArea] = useState("Growth");
   const [body, setBody] = useState("");
+  const [why, setWhy] = useState("");
   const [win, setWin] = useState("");
   const [busy, setBusy] = useState(false);
+  const [polishing, setPolishing] = useState(false);
   const voice = useVoice((t) => setBody((b) => (b ? b + " " : "") + t.trim()));
+
+  async function polish() {
+    if (body.trim().length < 20 || polishing) { say("Ramble a bit more first 🎤"); return; }
+    setPolishing(true);
+    try {
+      const j = await (await fetch("/api/cleanup", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: (title ? title + "\n" : "") + body, type: mode }),
+      })).json();
+      if (j.error) throw new Error(j.error);
+      setTitle(j.title || title);
+      if (j.area) setArea(j.area);
+      setBody(j.body || body);
+      setWhy(j.why || "");
+      say("Cleaned up ✨ — review, then save");
+    } catch (e) { say("Couldn't clean up: " + e.message); }
+    setPolishing(false);
+  }
 
   function usePrompt(q) {
     setBody((b) => (b ? b + "\n\n" : "") + q + "\n");
@@ -1355,7 +1590,7 @@ function Journal({ xp, say }) {
     try {
       const j = await (await fetch("/api/journal", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: mode, title: title.trim(), area, body: body.trim() }),
+        body: JSON.stringify({ type: mode, title: title.trim(), area, why, body: body.trim() }),
       })).json();
       if (j.error) throw new Error(j.error);
       xp(10, true); say((mode === "goal" ? "Goal" : "Dream") + " saved to Notion. +10 XP 🎯");
@@ -1403,7 +1638,13 @@ function Journal({ xp, say }) {
         {mode === "gratitude" && (
           <input value={win} onChange={(e) => setWin(e.target.value)} placeholder="One win today 🏆 (optional)" />
         )}
-        <button className="btn" disabled={busy} onClick={save}>{busy ? "Saving…" : "Save to Notion (+10 XP)"}</button>
+        {why && <p className="empty">💡 Why this matters: {why}</p>}
+        <div className="tbtns" style={{ justifyContent: "flex-start" }}>
+          {mode !== "gratitude" && (
+            <button className="btn sec" disabled={polishing} onClick={polish}>{polishing ? "Polishing…" : "✨ Clean up my ramble"}</button>
+          )}
+          <button className="btn" disabled={busy} onClick={save}>{busy ? "Saving…" : "Save to Notion (+10 XP)"}</button>
+        </div>
       </section>
       <section>
         <h2>💡 How this works</h2>

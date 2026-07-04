@@ -81,7 +81,7 @@ export default async function handler(req, res) {
       }
     } catch {}
 
-    // 4) Sunday: week recap teaser
+    // 4) Sunday: the coach reviews your week, unprompted
     try {
       if (new Date().getUTCDay() === 0) {
         const weekStart = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
@@ -89,7 +89,26 @@ export default async function handler(req, res) {
           filter: { and: [{ property: "Date", date: { on_or_after: weekStart } }, { property: "Date", date: { on_or_before: today } }] },
         });
         const perf = week.filter((r) => H75.every(([prop]) => check(r, prop))).length;
-        lines.push(`📊 This week: ${perf}/7 perfect days — full recap lands in Notion at 6pm.`);
+        let coachLine = `📊 This week: ${perf}/7 perfect days — full recap lands in Notion at 6pm.`;
+        const akey = process.env.ANTHROPIC_API_KEY;
+        if (akey) {
+          try {
+            const r = await fetch("https://api.anthropic.com/v1/messages", {
+              method: "POST",
+              headers: { "x-api-key": akey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+              body: JSON.stringify({
+                model: process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001",
+                max_tokens: 120,
+                system: "You are Michael's hard-nosed but supportive coach (Goggins intensity, Jocko discipline). Write a 1-2 sentence Sunday check-in push notification about his 75 Hard week. Plain text, no markdown, no emojis, under 200 characters. Direct, personal, end with a charge for the coming week.",
+                messages: [{ role: "user", content: `This week he logged ${perf} perfect days out of 7 on 75 Hard.` }],
+              }),
+            });
+            const j = await r.json();
+            const t = (j.content || []).map((c) => c.text || "").join("").trim();
+            if (t) coachLine = "🥊 Coach: " + t;
+          } catch {}
+        }
+        lines.push(coachLine);
       }
     } catch {}
 
