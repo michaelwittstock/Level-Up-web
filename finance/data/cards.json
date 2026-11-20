@@ -1,0 +1,28 @@
+[
+  {
+    "id": "example-card-a",
+    "issuer": "EXAMPLE — replace me",
+    "name": "Example Card A",
+    "last4": "0000",
+    "limit": 5000,
+    "balance": 3200,
+    "apr": 27.99,
+    "min_payment": 96,
+    "due_day": 15,
+    "statement_close_day": 20,
+    "rewards": {"base": 1.5, "categories": {}}
+  },
+  {
+    "id": "example-card-b",
+    "issuer": "EXAMPLE — replace me",
+    "name": "Example Card B",
+    "last4": "0001",
+    "limit": 2000,
+    "balance": 900,
+    "apr": 22.49,
+    "min_payment": 35,
+    "due_day": 3,
+    "statement_close_day": 8,
+    "rewards": {"base": 1, "categories": {"dining": 3, "grocery": 3}}
+  }
+]
