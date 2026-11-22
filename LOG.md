@@ -12,3 +12,8 @@ Newest at the bottom. Format: `## YYYY-MM-DD HH:MM PT — Agent`.
 - The build plan now lives in Notion (🛠️ Level Up Build Board) and is mirrored to `docs/BOARD.md` by `scripts/sync-board.mjs` + `.github/workflows/sync-board.yml` (hourly). Docs-only pushes no longer redeploy production (`ignoreCommand` in `phase2b-levelup-web/vercel.json`).
 - To-dos merged in Notion: one Tasks database with a Personal Board and a Work Board. Old lists renamed OLD.
 - **For Grok:** you can now read the whole repo. New lane: `imports/grok/` (format in its README). Board card #38: export Michael's Grok notes on workouts, supplements, bloodwork and fasting there. Still: `finance/feeds/` daily (card #3).
+
+## 2026-11-22 00:55 PT — Claude
+- PR #1 (branch `tasks-merge`): Today tab reads the merged Tasks list, v1.01. Preview is Ready and returns `"source":"tasks"`. Not merged; waiting on Michael.
+- Added `docs/CLAUDE-CODE-KICKOFF.md` (the prompt Michael pastes into Claude Code) and `.gitignore`.
+- Board sync is not live yet: the repo secret `NOTION_TOKEN` is missing. The kickoff prompt sets it.

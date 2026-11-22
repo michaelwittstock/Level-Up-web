@@ -5,6 +5,7 @@ The one page to read first, for any AI or person working on this repo: what Leve
 - **Live app:** https://levelup.michaelwittstock.com
 - **Repo:** https://github.com/michaelwittstock/level-up-web (branch `main`)
 - **The plan:** [`docs/BOARD.md`](BOARD.md), a copy of the Notion build board that syncs every hour
+- **Claude Code kickoff prompt:** [`docs/CLAUDE-CODE-KICKOFF.md`](CLAUDE-CODE-KICKOFF.md)
 - **Agent rules:** [`AGENTS.md`](../AGENTS.md) · **Handoff log:** [`LOG.md`](../LOG.md) · **Design rules:** [`docs/DESIGN.md`](DESIGN.md)
 
 ## What Level Up is

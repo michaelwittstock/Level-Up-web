@@ -1,10 +1,10 @@
 # Level Up Build Board
 
-_Last synced from Notion: Nov 22, 2026, 12:36 AM PT_
+_Last synced from Notion: Nov 22, 2026, 12:41 AM PT_
 
 Mirror of the Notion board ([open in Notion](https://app.notion.com/p/c703f3206a1f4481a80f2450d390f569)). **Edit cards in Notion, not here.** This file is rewritten from Notion every hour by `.github/workflows/sync-board.yml`.
 
-Building 1 · Up Next 7 · Idea 26 · Shipped 4
+Building 1 · Up Next 7 · Idea 26 · Shipped 5
 
 Owners: **Claude** builds the app · **Grok** data feeds and exports · **Michael** decisions and anything only he can do.
 
@@ -12,7 +12,7 @@ Owners: **Claude** builds the app · **Grok** data feeds and exports · **Michae
 
 | # | Area | Card | Owner | Notes |
 |---|---|---|---|---|
-| 26 | Tasks | App Today tab reads the merged Tasks list (Now + Today lanes) | Claude | Pull request with a Vercel preview. Falls back to the old list if Tasks isn't connected to the Level Up App integration yet. |
+| 26 | Tasks | App Today tab reads the merged Tasks list (Now + Today lanes) | Claude | PR #1: github.com/michaelwittstock/Level-Up-web/pull/1. Preview build is Ready and reads Tasks (5 cards in Now + Today). Waiting on Michael's OK to merge. |
 
 ## Up Next
 
@@ -63,5 +63,6 @@ Owners: **Claude** builds the app · **Grok** data feeds and exports · **Michae
 |---|---|---|---|---|
 | 22 | Platform | Repo wiki for Grok: docs/WIKI.md (what Level Up is, how it's built) | Claude | Grok reads it at github.com/michaelwittstock/level-up-web/blob/main/docs/WIKI.md |
 | 23 | Platform | Sync this board to docs/BOARD.md (script + hourly GitHub Action) | Claude | Notion is the source of truth. Manual run: npm run board in phase2b-levelup-web. |
+| 39 | Platform | Claude Code kickoff prompt: docs/CLAUDE-CODE-KICKOFF.md | Claude | Michael pastes it into Claude Code. It sets up the Mac, turns on the board sync, ships PR #1 and starts Design v2. |
 | 25 | Tasks | Merge all to-do lists into Tasks (Personal Board + Work Board) | Claude | Moved 18 open items from To-Do & Brain Dump, Life Board and WD Work Board. Old lists renamed OLD and kept as history. |
 | 2 | Money | Finance module added to Level-Up-web (finance/, AGENTS.md, LOG.md, payoff calculator) | Claude |  |
