@@ -1,18 +1,12 @@
 # Level Up Build Board
 
-_Last synced from Notion: Nov 22, 2026, 12:41 AM PT_
+_Last synced from Notion: Nov 22, 2026, 3:02 PM PT_
 
 Mirror of the Notion board ([open in Notion](https://app.notion.com/p/c703f3206a1f4481a80f2450d390f569)). **Edit cards in Notion, not here.** This file is rewritten from Notion every hour by `.github/workflows/sync-board.yml`.
 
-Building 1 · Up Next 7 · Idea 26 · Shipped 5
+Building 0 · Up Next 7 · Idea 26 · Shipped 6
 
 Owners: **Claude** builds the app · **Grok** data feeds and exports · **Michael** decisions and anything only he can do.
-
-## Building
-
-| # | Area | Card | Owner | Notes |
-|---|---|---|---|---|
-| 26 | Tasks | App Today tab reads the merged Tasks list (Now + Today lanes) | Claude | PR #1: github.com/michaelwittstock/Level-Up-web/pull/1. Preview build is Ready and reads Tasks (5 cards in Now + Today). Waiting on Michael's OK to merge. |
 
 ## Up Next
 
@@ -65,4 +59,5 @@ Owners: **Claude** builds the app · **Grok** data feeds and exports · **Michae
 | 23 | Platform | Sync this board to docs/BOARD.md (script + hourly GitHub Action) | Claude | Notion is the source of truth. Manual run: npm run board in phase2b-levelup-web. |
 | 39 | Platform | Claude Code kickoff prompt: docs/CLAUDE-CODE-KICKOFF.md | Claude | Michael pastes it into Claude Code. It sets up the Mac, turns on the board sync, ships PR #1 and starts Design v2. |
 | 25 | Tasks | Merge all to-do lists into Tasks (Personal Board + Work Board) | Claude | Moved 18 open items from To-Do & Brain Dump, Life Board and WD Work Board. Old lists renamed OLD and kept as history. |
+| 26 | Tasks | App Today tab reads the merged Tasks list (Now + Today lanes) | Claude | Live in v1.01. Michael merged PR #1 on Nov 22; production reads Tasks (Now + Today lanes) and falls back to the old list only if Tasks can't be read. |
 | 2 | Money | Finance module added to Level-Up-web (finance/, AGENTS.md, LOG.md, payoff calculator) | Claude |  |
