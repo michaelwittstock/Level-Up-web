@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import Head from "next/head";
 
-const VERSION = "v1.00";
+const VERSION = "v1.01";
 // tiny haptics — no-op where unsupported (iOS Safari)
 function buzz(pattern) { try { navigator.vibrate && navigator.vibrate(pattern); } catch {} }
 const MDM_PAGE = "160fcb70586380d7afcbefb75870943e"; // 🌅 Million Dollar Morning (Brad Lea)
@@ -405,7 +405,7 @@ function Today({ xp, say, openPage }) {
       {data && (
         <section>
           <h2>Tasks <span className="sub">{data.tasks.length ? data.tasks.length + " to go" : "clear"}</span></h2>
-          {data.tasks.length === 0 && <p className="empty">No tasks set for 🔥 Today. Add one in your hub. ✨</p>}
+          {data.tasks.length === 0 && <p className="empty">Nothing in Now or Today. Move a card on your Tasks board. ✨</p>}
           {data.tasks.map((t) => (
             <div className="task" key={t.id}>
               <div className="tk">
