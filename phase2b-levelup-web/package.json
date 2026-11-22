@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "board": "node ../scripts/sync-board.mjs"
   },
   "dependencies": {
     "@notionhq/client": "^2.2.15",

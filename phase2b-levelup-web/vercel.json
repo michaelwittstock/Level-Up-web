@@ -1,6 +1,13 @@
 {
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- . ../finance",
   "crons": [
-    { "path": "/api/push-daily", "schedule": "0 14 * * *" },
-    { "path": "/api/push-breathe", "schedule": "0 21 * * *" }
+    {
+      "path": "/api/push-daily",
+      "schedule": "0 14 * * *"
+    },
+    {
+      "path": "/api/push-breathe",
+      "schedule": "0 21 * * *"
+    }
   ]
 }
