@@ -7,7 +7,8 @@ export const notion = new Client({
 
 // ---- Database IDs (Personal Level Up hub) ----
 export const DB = {
-  todo:     "19525df701d14d278163fb6954278917", // ✅ To-Do & Brain Dump
+  tasks:    "a8731f8a82504988bc6a10a77493557c", // ✅ Tasks (Master Command Center) — THE to-do list since Nov 22, 2026
+  todo:     "19525df701d14d278163fb6954278917", // 🗄️ OLD To-Do & Brain Dump — fallback only
   routines: "1035973dfe3143faa11b86298a0032fb", // 🔁 Routines & Habits
   quotes:   "e1147eed857b48d0a2a7be03bfd2668a", // 💬 Quotes
   h75:      "7c2ee1019e85489fb24ee3385bc0b1c7", // 🔥 75 Hard Tracker
