@@ -22,3 +22,8 @@ Newest at the bottom. Format: `## YYYY-MM-DD HH:MM PT — Agent`.
 - Michael merged PR #1. v1.01 is live: production `/api/today` returns `"source":"tasks"` with the 5 Now + Today cards. Board card #26 moved to Shipped.
 - Board sync still isn't live: the last two scheduled runs skipped with "NOTION_TOKEN secret is not set yet". `docs/BOARD.md` was refreshed by hand from Notion in this push. Fix: Step 3 of `docs/CLAUDE-CODE-KICKOFF.md`, or add the secret at https://github.com/michaelwittstock/level-up-web/settings/secrets/actions/new.
 - Next card: #27, Daily Command Center + 7 AM printout read Tasks.
+
+## 2026-11-23 09:15 PT — Claude
+- QA pass: test agents ran a code audit, a read-only check of the live app, a device/readability pass (8 screen sizes, light + dark) and a stress test. 72 issues, 57 screenshots, in a private report for Michael.
+- Added board cards #40–#48 (QA fix 1–9). #40 (add a login) goes first. #41: the live Learn tab fails because `DB.library` in `lib/notion.js` can't be read by the integration, and `/report` asks Notion for the 31st of 30-day months.
+- No app code changed in this push.

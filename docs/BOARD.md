@@ -1,10 +1,10 @@
 # Level Up Build Board
 
-_Last synced from Notion: Nov 22, 2026, 3:02 PM PT_
+_Last synced from Notion: Nov 23, 2026, 9:12 AM PT_
 
 Mirror of the Notion board ([open in Notion](https://app.notion.com/p/c703f3206a1f4481a80f2450d390f569)). **Edit cards in Notion, not here.** This file is rewritten from Notion every hour by `.github/workflows/sync-board.yml`.
 
-Building 0 · Up Next 7 · Idea 26 · Shipped 6
+Building 0 · Up Next 13 · Idea 29 · Shipped 6
 
 Owners: **Claude** builds the app · **Grok** data feeds and exports · **Michael** decisions and anything only he can do.
 
@@ -15,8 +15,14 @@ Owners: **Claude** builds the app · **Grok** data feeds and exports · **Michae
 | 1 | Platform | Make Level-Up-web repo private (currently public) | Michael | Public now so Grok can read the code by link. Before Grok pushes REAL balances into finance/feeds/, make the repo private AND give Grok GitHub access to it, or real numbers become public. |
 | 24 | Platform | Turn on the board sync: add NOTION_TOKEN to GitHub + connect Level Up App to this board and Tasks | Michael | 2 minutes. Steps are in docs/WIKI.md under 'Turning on the board sync'. |
 | 38 | Platform | Export Grok's life notes (workouts, supplements, bloodwork, fasting) to imports/grok/ | Grok | Markdown files only. Claude turns them into Notion data. |
+| 40 | Platform | QA fix 1: Add a login so only Michael can open the app, its data and the Life Report | Claude | Do first. QA report Nov 23, section 01 (7 items). Also set CRON_SECRET in Vercel and make the cron check required. |
+| 43 | Platform | QA fix 4: Failed saves must say so (no green tick or XP when Notion fails), retry on read errors | Claude | QA report section 04 (8 items). |
+| 44 | Platform | QA fix 5: Keep timers and typing when switching tabs; pull-to-refresh only from the page top, never inside a text box | Claude | QA report section 05 (2 items). |
 | 27 | Tasks | Daily Command Center + 7 AM printout read Tasks instead of the old list | Claude | Its views still point at the OLD To-Do & Brain Dump (Do Date, Must). Map to Tasks Due + Lane Today/Now. |
+| 42 | Tasks | QA fix 3: Stop wrong data being saved (double-tap Done, past-midnight 75 Hard, $0 / comma numbers, streak and XP inflation) | Claude | QA report section 03 (14 items, 2 critical). |
 | 29 | Design | Design system v2: Taste rules + Mobbin references across every tab | Claude | References in the Project doc claude/sprint-1-inventory.md. Needs the approved tile-mockup.html. |
+| 45 | Design | QA fix 6: Phone layout: Reflect wider than the screen (hides the tab bar), long text, rows overflowing, reader close button | Claude | QA report section 06 (14 items). Fold into Design system v2 if that starts first. |
+| 41 | Mind | QA fix 2: Learn tab live error + Life Report zeros in 30-day months | Claude | QA report section 02. Learn points at a Library database the integration can't read; report asks Notion for the 31st of a 30-day month. |
 | 3 | Money | Grok: daily account balances + prices feed to finance/feeds/ | Grok | Grok already has the accounts connected, so SimpleFIN is optional backup only. Prompt is in chat. |
 | 4 | Money | Expand Level Up Money tab (cards, due dates, debt payoff, net worth) | Claude | Built inside Level Up (Vercel project level-up), not a separate dashboard. |
 
@@ -25,7 +31,10 @@ Owners: **Claude** builds the app · **Grok** data feeds and exports · **Michae
 | # | Area | Card | Owner | Notes |
 |---|---|---|---|---|
 | 30 | Platform | Split pages/index.js into one component per tab | Claude |  |
+| 48 | Platform | QA fix 9: Polish: 90-day chart blank, chart chip race, empty states, accessibility labels | Claude | QA report section 09 (10 items). |
 | 28 | Tasks | Decide: fold Wittstock Digital OS Work Tracker cards into Tasks, or keep it as the company board | Michael | Work Tracker has departments, projects and Claude's engineering cards, so it was left alone. |
+| 46 | Design | QA fix 7: Readability: faint grey text, white-on-blue buttons, gold tags in light mode, input edges, Life Report print | Claude | QA report section 07 (11 items). No true black-on-black found. Best done inside Design system v2 (card #29). |
+| 47 | Design | QA fix 8: iPhone home-screen safe area, iPad/laptop tab bar and width, 44px tap targets | Claude | QA report section 08 (4 items). |
 | 31 | Body | Body tab: weekly split (Mon push, Tue legs, Wed walk, Thu pull, Fri full-body light, weekend walk + 8-min stretch) + Workout Log + PRs | Claude | Plan comes from the old Life Board workout cards. Bevel / Gymshark layouts. |
 | 32 | Body | Fasting timer + Fasting Log database | Claude | Yazio / Runna ring layout. |
 | 33 | Labs | Labs: Labs database + bloodwork PDF upload, markers over time with ranges | Claude | Needs Michael's bloodwork PDF. Shows out-of-range flags and questions for the doctor, never doses. |
