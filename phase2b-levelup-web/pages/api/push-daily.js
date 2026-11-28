@@ -6,8 +6,8 @@ const SUBS_DB = "d284b883c1bb4b09931c195f14397bae"; // 🔔 Push Subscriptions
 // GET /api/push-daily — called by Vercel Cron each morning.
 // Sends one favorite quote to every subscribed device.
 export default async function handler(req, res) {
-  // If CRON_SECRET is set, only allow Vercel Cron (it sends this header).
-  if (process.env.CRON_SECRET && req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
+  // Only Vercel Cron may call this (it sends CRON_SECRET). No secret set = locked.
+  if (!process.env.CRON_SECRET || req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
     return res.status(401).json({ error: "unauthorized" });
   }
   const pub = process.env.VAPID_PUBLIC_KEY, priv = process.env.VAPID_PRIVATE_KEY;

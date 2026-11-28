@@ -100,6 +100,12 @@ The target look is in [`docs/DESIGN.md`](DESIGN.md): Satoshi + JetBrains Mono, o
 - **Labs** show values, ranges and flags, plus questions for Michael's doctor. The app never sets supplement doses or tells him to stop or start a medication. A dose shown is what's on the bottle or what his doctor said.
 - **Money** access is read-only. No agent pays, transfers or applies for anything. No full card or account numbers anywhere; last 4 digits only.
 
+## Login and secrets
+
+The whole app sits behind one passcode (`middleware.js` + `pages/login.js`). Every page and `/api/*` route returns a login screen or `401` without the `lu_session` cookie. Only `/share` (public 75 Hard scoreboard) is open, and three routes check their own secret instead: `/api/push-daily` and `/api/push-breathe` (`CRON_SECRET`, sent by Vercel Cron) and `/api/health` (`HEALTH_KEY`).
+
+Vercel env vars the gate needs (Production + Preview): `APP_PASSCODE` (12+ characters) and `CRON_SECRET` (long random string). With `APP_PASSCODE` missing the app shows "Level Up is locked" instead of opening up. Changing `APP_PASSCODE` signs out every device. The installed iPhone app keeps its own cookie, so sign in once inside it too.
+
 ## Turning on the board sync
 
 `.github/workflows/sync-board.yml` runs every hour and rewrites `docs/BOARD.md` from Notion. It needs two one-time steps from Michael:

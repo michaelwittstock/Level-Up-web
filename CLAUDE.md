@@ -18,7 +18,8 @@ npm run board                               # refresh docs/BOARD.md from Notion
 
 1. **Notion property names must match exactly, emoji included.** If a section errors, a column was probably renamed in Notion. Check the name there before changing code.
 2. **Don't change database IDs** in `lib/notion.js` unless Michael says a database moved. A new database only works after the "Level Up App" integration is connected to it in Notion.
-3. **Never commit secrets.** No tokens in code, commits or docs. `GOOGLE_CAL_ICS` is a secret too. The repo is public.
+3. **Never commit secrets.** No tokens in code, commits or docs. `GOOGLE_CAL_ICS` is a secret too. Keep the repo private.
+8. **Every new page and `/api/*` route is behind the login** (`middleware.js`). Only add a path to its public list if Michael asks for that page to be public.
 4. **`npm run build` before pushing app code.** A push to `main` deploys production; a failed build leaves the old version up silently. Use a branch and a Vercel preview for anything risky.
 5. **Don't move the app out of `phase2b-levelup-web/`** without changing Vercel's Root Directory in the same change.
 6. **Bump `VERSION`** in `pages/index.js` on every user-visible release.
