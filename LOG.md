@@ -27,3 +27,8 @@ Newest at the bottom. Format: `## YYYY-MM-DD HH:MM PT — Agent`.
 - QA pass: test agents ran a code audit, a read-only check of the live app, a device/readability pass (8 screen sizes, light + dark) and a stress test. 72 issues, 57 screenshots, in a private report for Michael.
 - Added board cards #40–#48 (QA fix 1–9). #40 (add a login) goes first. #41: the live Learn tab fails because `DB.library` in `lib/notion.js` can't be read by the integration, and `/report` asks Notion for the 31st of 30-day months.
 - No app code changed in this push.
+
+## 2026-11-27 18:30 PT — Claude
+- Security: the live app had no login, so anyone with the URL could read every Net Worth row and change its Value through `/api/money`, read Notion pages through `/api/page`, and run up the Anthropic key through `/api/coach` and `/api/cleanup`. No keys or real figures were ever committed (checked all history).
+- Branch `security/app-login`: passcode login for every page and API route (board card #40), cron routes now require `CRON_SECRET`. Not merged; needs `APP_PASSCODE` + `CRON_SECRET` in Vercel first, then Michael's yes. Repo still public until he switches it.
+
